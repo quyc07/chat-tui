@@ -12,4 +12,14 @@ pub enum Action {
     ClearScreen,
     Error(String),
     Help,
+    Alert(String, ConfirmEvent),
+    Confirm(ConfirmEvent),
 }
+
+#[derive(Clone, Debug, Eq, PartialEq, Display, Serialize, Deserialize)]
+pub enum ConfirmEvent {
+    Nothing,
+    Submit,
+    Score,
+}
+

@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
@@ -28,8 +29,34 @@ pub struct App {
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Mode {
     #[default]
-    Home,
+    Login,
+    Input,
+    Alert,
 }
+
+#[derive(Default)]
+pub struct ModeHolder {
+    pub mode: Mode,
+}
+
+impl ModeHolder {
+    pub fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+    }
+}
+
+pub struct ModeHolderLock(pub Arc<Mutex<ModeHolder>>);
+
+impl ModeHolderLock {
+    pub fn set_mode(&self, mode: Mode) {
+        self.0.lock().unwrap().set_mode(mode);
+    }
+
+    pub fn get_mode(&self) -> Mode {
+        self.0.lock().unwrap().mode
+    }
+}
+
 
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
@@ -41,7 +68,7 @@ impl App {
             should_quit: false,
             should_suspend: false,
             config: Config::new()?,
-            mode: Mode::Home,
+            mode: Mode::Login,
             last_tick_key_events: Vec::new(),
             action_tx,
             action_rx,

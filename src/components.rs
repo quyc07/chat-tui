@@ -1,15 +1,20 @@
 use color_eyre::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{
-    Frame,
     layout::{Rect, Size},
+    Frame,
 };
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{action::Action, config::Config, tui::Event};
 
+mod area_util;
 pub mod fps;
 pub mod home;
+pub mod login;
+pub mod user_input;
+mod alert;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 ///
