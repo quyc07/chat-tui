@@ -1,48 +1,82 @@
 use crate::action::Action;
-use crate::app::{Mode, ModeHolderLock};
 use crate::components::Component;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
+use ratatui::prelude::{Color, Style};
 use ratatui::widgets::Widget;
 use ratatui::Frame;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-pub struct UserInput {
-    /// Current value of the input box
-    input: Option<String>,
-    /// 加载组件时带入的用户输入 TODO 用户输入类型和数据
-    input_data: Option<InputData>,
-    /// Position of cursor in the editor area.
+pub(crate) struct UserInput {
+    /// 当前文本框内容
+    pub(crate) input: Option<String>,
+    /// 用户输入类型和预加载的数据
+    pub(crate) input_data: InputData,
+    /// 光标在文本框的索引
     character_index: usize,
-    /// 
-    input_rx: UnboundedReceiver<InputData>,
-    /// 答案
-    input_tx: UnboundedSender<InputData>,
-    /// 全局状态
-    mode_holder: ModeHolderLock,
     /// 输入框光标位置
     cursor_position: Option<Position>,
+    /// 是否正在编辑该文本框
+    pub(crate) is_editing: bool,
 }
 
-enum InputData {
-    UserName(Option<String>),
-    Password(Option<String>),
-    ChatMsg(Option<String>),
+pub(crate) enum InputData {
+    UserName {
+        label: Option<String>,
+        data: Option<String>,
+    },
+    Password {
+        label: Option<String>,
+        data: Option<String>,
+    },
+    ChatMsg {
+        label: Option<String>,
+        data: Option<String>,
+    },
 }
 
 impl InputData {
-    pub fn set_input(&mut self, data: Option<String>) {
+    fn set_input(&mut self, input_data: Option<String>) {
         match self {
-            InputData::UserName(_) => {
-                *self = InputData::UserName(data);
+            InputData::UserName { label: _, data } => {
+                *data = input_data;
             }
-            InputData::Password(_) => {
-                *self = InputData::Password(data);
+            InputData::Password { label: _, data } => {
+                *data = input_data;
             }
-            InputData::ChatMsg(_) => {
-                *self = InputData::ChatMsg(data);
+            InputData::ChatMsg { label: _, data } => {
+                *data = input_data;
             }
+        }
+    }
+
+    fn reset_input(&mut self) {
+        match self {
+            InputData::UserName { label: _, data } => {
+                *data = None;
+            }
+            InputData::Password { label: _, data } => {
+                *data = None;
+            }
+            InputData::ChatMsg { label: _, data } => {
+                *data = None;
+            }
+        }
+    }
+
+    fn get_input_data(&self) -> Option<String> {
+        match self {
+            InputData::UserName { label: _, data } => data.clone(),
+            InputData::Password { label: _, data } => data.clone(),
+            InputData::ChatMsg { label: _, data } => data.clone(),
+        }
+    }
+
+    pub(crate) fn label(&self) -> String {
+        match self {
+            InputData::UserName { label, data: _ } => label.clone().unwrap_or_default(),
+            InputData::Password { label, data: _ } => label.clone().unwrap_or_default(),
+            InputData::ChatMsg { label, data: _ } => label.clone().unwrap_or_default(),
         }
     }
 }
@@ -52,33 +86,26 @@ impl Widget for &mut UserInput {
     where
         Self: Sized,
     {
-        match self.mode_holder.get_mode() {
-            Mode::Login => {}
-
-            Mode::Input => {}
-            _ => {}
-        }
     }
 }
 
 impl Component for UserInput {
     fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {
-        if self.mode_holder.get_mode() == Mode::Input {
+        if self.is_editing {
             match key.code {
                 KeyCode::Enter => self.submit_message(),
                 KeyCode::Char(to_insert) => self.enter_char(to_insert),
                 KeyCode::Backspace => self.delete_char(),
                 KeyCode::Left => self.move_cursor_left(),
                 KeyCode::Right => self.move_cursor_right(),
-                KeyCode::Esc => self.close(),
+                KeyCode::Esc => self.is_editing = false,
                 _ => {}
             }
         }
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
-        frame.render_widget(&mut *self, area);
+    fn draw(&mut self, frame: &mut Frame, _area: Rect) -> color_eyre::Result<()> {
         if let Some(position) = self.cursor_position {
             frame.set_cursor_position(position)
         }
@@ -87,21 +114,30 @@ impl Component for UserInput {
 }
 
 impl UserInput {
-    pub fn new() -> Self {
-        todo!()
+    pub(crate) fn data(&self) -> Option<String> {
+        self.input_data.get_input_data()
+    }
+    pub fn new(input_data: InputData) -> Self {
+        Self {
+            input: None,
+            input_data,
+            character_index: 0,
+            cursor_position: None,
+            is_editing: false,
+        }
     }
 
-    fn move_cursor_left(&mut self) {
+    pub(crate) fn move_cursor_left(&mut self) {
         let cursor_moved_left = self.character_index.saturating_sub(1);
         self.character_index = self.clamp_cursor(cursor_moved_left);
     }
 
-    fn move_cursor_right(&mut self) {
+    pub(crate) fn move_cursor_right(&mut self) {
         let cursor_moved_right = self.character_index.saturating_add(1);
         self.character_index = self.clamp_cursor(cursor_moved_right);
     }
 
-    fn enter_char(&mut self, new_char: char) {
+    pub(crate) fn enter_char(&mut self, new_char: char) {
         let index = self.byte_index();
         let mut input = self.current_input();
         input.insert(index, new_char);
@@ -121,7 +157,7 @@ impl UserInput {
             .unwrap_or(self.current_input().len())
     }
 
-    fn delete_char(&mut self) {
+    pub(crate) fn delete_char(&mut self) {
         let is_not_cursor_leftmost = self.character_index != 0;
         if is_not_cursor_leftmost {
             // Method "remove" is not used on the saved text for deleting the selected char.
@@ -162,22 +198,14 @@ impl UserInput {
         self.input = Some(input);
     }
 
-    fn submit_message(&mut self) {
-        let mut input_data = self.input_data.take().unwrap();
-        input_data.set_input(self.input.clone());
-        self.input_tx.send(input_data).unwrap();
-        self.reset()
+    pub(crate) fn submit_message(&mut self) {
+        self.input_data.set_input(self.input.clone());
     }
 
     fn reset(&mut self) {
         self.input.take();
-        self.input_data.take();
+        self.input_data.reset_input();
         self.reset_cursor();
-    }
-
-    fn close(&mut self) {
-        self.input_tx.send(self.input_data.take().unwrap()).unwrap();
-        self.reset()
     }
 
     fn cal_high(input_size: usize, area: Rect) -> u16 {
@@ -189,7 +217,7 @@ impl UserInput {
         }
     }
 
-    fn set_cursor_position(&mut self, input_area: Rect) {
+    pub(crate) fn set_cursor_position(&mut self, input_area: Rect) {
         self.cursor_position = Some(Position::new(
             // Draw the cursor at the current position in the input field.
             // This position is can be controlled via the left and right arrow key
@@ -197,6 +225,14 @@ impl UserInput {
             // Move one line down, from the border to the input line
             input_area.y + 1,
         ))
+    }
+
+    pub(crate) fn select_style(&self) -> Style {
+        if self.is_editing {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default()
+        }
     }
 }
 

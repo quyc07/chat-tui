@@ -13,7 +13,7 @@ pub enum Action {
     Error(String),
     Help,
     Alert(String, ConfirmEvent),
-    Confirm(ConfirmEvent),
+    Confirm,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Display, Serialize, Deserialize)]

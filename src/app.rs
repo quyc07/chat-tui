@@ -1,14 +1,16 @@
-use std::sync::{Arc, Mutex};
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 
+use crate::components::login::Login;
+use crate::components::user_input::{InputData, UserInput};
 use crate::{
     action::Action,
-    components::{Component, fps::FpsCounter, home::Home},
+    components::{fps::FpsCounter, home::Home, Component},
     config::Config,
     tui::{Event, Tui},
 };
@@ -30,8 +32,9 @@ pub struct App {
 pub enum Mode {
     #[default]
     Login,
-    Input,
-    Alert,
+    RecentChat,
+    Contact,
+    Setting,
 }
 
 #[derive(Default)]
@@ -57,14 +60,22 @@ impl ModeHolderLock {
     }
 }
 
-
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
+        let user_name_input = UserInput::new(InputData::UserName {
+            label: Some("用户名".to_string()),
+            data: None,
+        });
+        let password_input = UserInput::new(InputData::Password {
+            label: Some("密码".to_string()),
+            data: None,
+        });
+        let login = Login::new(ModeHolderLock(Arc::new(Mutex::new(ModeHolder::default()))));
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(Home::new()), Box::new(FpsCounter::default())],
+            components: vec![Box::new(login),Box::new(user_name_input),Box::new(password_input)],
             should_quit: false,
             should_suspend: false,
             config: Config::new()?,
