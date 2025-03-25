@@ -98,36 +98,35 @@ impl Component for Login {
     }
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
-        match action {
-            Action::Confirm => {
-                // todo!("调用login接口")
-                info!(
-                    "Username: {}, Password: {}",
-                    self.user_name_input.data().unwrap_or("***".to_string()),
-                    self.password_input.data().unwrap_or("***".to_string())
-                );
+        if self.mode_holder.get_mode() == Mode::Login {
+            match action {
+                Action::Confirm => {
+                    // todo!("调用login接口")
+                    info!(
+                        "Username: {}, Password: {}",
+                        self.user_name_input.data().unwrap_or("***".to_string()),
+                        self.password_input.data().unwrap_or("***".to_string())
+                    );
+                    self.mode_holder.set_mode(Mode::RecentChat);
+                }
+                _ => {}
             }
-            _ => {}
         }
         Ok(None)
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
+        if self.mode_holder.get_mode() != Mode::Login {
+            return Ok(());
+        }
         let bg_block = Block::default()
             .borders(Borders::ALL)
             .style(Style::default().fg(Color::Green));
 
-        let area = area_util::total_area(frame);
+        let area = area_util::total_area(area);
         frame.render_widget(bg_block, area);
 
-        let [
-            cli_name_area,
-            help_area,
-            user_name_area,
-            password_area,
-            button_area,
-            _,
-        ] = Layout::default()
+        let [cli_name_area, help_area, user_name_area, password_area, _] = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Min(1),
@@ -135,7 +134,6 @@ impl Component for Login {
                 Constraint::Length(3),
                 Constraint::Length(3),
                 Constraint::Length(3),
-                Constraint::Length(1),
             ])
             .areas(area);
 

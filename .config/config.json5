@@ -1,11 +1,20 @@
 {
   "keybindings": {
     "Login": {
-      "<q>": "Quit", // Quit the application
-      "<Ctrl-d>": "Quit", // Another way to quit
-      "<Ctrl-c>": "Quit", // Yet another way to quit
-      "<Ctrl-z>": "Suspend", // Suspend the application
+      "<Ctrl-c>": "Quit",
       "<Ctrl-s>": "Confirm"
     },
+    "RecentChat": {
+      "<Ctrl-c>": "Quit",
+      "<Tab>": "NextTab"
+    },
+    "Contact": {
+      "<Ctrl-c>": "Quit",
+      "<Tab>": "NextTab"
+    },
+    "Setting": {
+      "<Ctrl-c>": "Quit",
+      "<Tab>": "NextTab"
+    }
   }
 }

@@ -15,6 +15,7 @@ pub mod home;
 pub mod login;
 pub mod user_input;
 mod alert;
+pub mod navigation;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 ///

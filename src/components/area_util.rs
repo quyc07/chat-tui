@@ -26,6 +26,6 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 // ANCHOR_END: centered_rect
 
-pub(crate) fn total_area(frame: &mut Frame) -> Rect {
-    Rect::new(0, 0, frame.area().width * 6 / 10, frame.area().height)
+pub(crate) fn total_area(rect: Rect) -> Rect {
+    Rect::new(0, 0, rect.width * 6 / 10, rect.height)
 }

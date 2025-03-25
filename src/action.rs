@@ -14,6 +14,7 @@ pub enum Action {
     Help,
     Alert(String, ConfirmEvent),
     Confirm,
+    NextTab,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Display, Serialize, Deserialize)]

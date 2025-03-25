@@ -7,10 +7,10 @@ use tokio::sync::mpsc;
 use tracing::{debug, info};
 
 use crate::components::login::Login;
-use crate::components::user_input::{InputData, UserInput};
+use crate::components::navigation::Navigation;
 use crate::{
     action::Action,
-    components::{fps::FpsCounter, home::Home, Component},
+    components::Component,
     config::Config,
     tui::{Event, Tui},
 };
@@ -22,7 +22,7 @@ pub struct App {
     components: Vec<Box<dyn Component>>,
     should_quit: bool,
     should_suspend: bool,
-    mode: Mode,
+    mode: ModeHolderLock,
     last_tick_key_events: Vec<KeyEvent>,
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
@@ -48,6 +48,7 @@ impl ModeHolder {
     }
 }
 
+#[derive(Clone)]
 pub struct ModeHolderLock(pub Arc<Mutex<ModeHolder>>);
 
 impl ModeHolderLock {
@@ -63,23 +64,17 @@ impl ModeHolderLock {
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let user_name_input = UserInput::new(InputData::UserName {
-            label: Some("用户名".to_string()),
-            data: None,
-        });
-        let password_input = UserInput::new(InputData::Password {
-            label: Some("密码".to_string()),
-            data: None,
-        });
-        let login = Login::new(ModeHolderLock(Arc::new(Mutex::new(ModeHolder::default()))));
+        let mode_holder = ModeHolderLock(Arc::new(Mutex::new(ModeHolder::default())));
+        let login = Login::new(mode_holder.clone());
+        let navigation = Navigation::new(mode_holder.clone());
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(login),Box::new(user_name_input),Box::new(password_input)],
+            components: vec![Box::new(login), Box::new(navigation)],
             should_quit: false,
             should_suspend: false,
             config: Config::new()?,
-            mode: Mode::Login,
+            mode: mode_holder.clone(),
             last_tick_key_events: Vec::new(),
             action_tx,
             action_rx,
@@ -145,7 +140,7 @@ impl App {
 
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
         let action_tx = self.action_tx.clone();
-        let Some(keymap) = self.config.keybindings.get(&self.mode) else {
+        let Some(keymap) = self.config.keybindings.get(&self.mode.get_mode()) else {
             return Ok(());
         };
         match keymap.get(&vec![key]) {
