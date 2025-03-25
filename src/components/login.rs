@@ -63,13 +63,12 @@ impl Component for Login {
     fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {
         if self.mode_holder.get_mode() == Mode::Login {
             match self.state {
-                State::Normal => match key.code {
-                    KeyCode::Char('e') => {
+                State::Normal => {
+                    if let KeyCode::Char('e') = key.code {
                         self.next_state();
                         info!("start editing user");
                     }
-                    _ => {}
-                },
+                }
                 State::UserNameEditing => match key.code {
                     KeyCode::Enter => {
                         self.user_name_input.submit_message();
@@ -99,17 +98,14 @@ impl Component for Login {
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if self.mode_holder.get_mode() == Mode::Login {
-            match action {
-                Action::Confirm => {
-                    // todo!("调用login接口")
-                    info!(
-                        "Username: {}, Password: {}",
-                        self.user_name_input.data().unwrap_or("***".to_string()),
-                        self.password_input.data().unwrap_or("***".to_string())
-                    );
-                    self.mode_holder.set_mode(Mode::RecentChat);
-                }
-                _ => {}
+            if action == Action::Confirm {
+                // todo!("调用login接口")
+                info!(
+                    "Username: {}, Password: {}",
+                    self.user_name_input.data().unwrap_or("***".to_string()),
+                    self.password_input.data().unwrap_or("***".to_string())
+                );
+                self.mode_holder.set_mode(Mode::RecentChat);
             }
         }
         Ok(None)

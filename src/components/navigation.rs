@@ -76,10 +76,11 @@ impl NavigationItem {
 impl Component for Navigation {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         match self.mode_holder.get_mode() {
-            Mode::RecentChat | Mode::Contact | Mode::Setting => match action {
-                Action::NextTab => self.item = self.item.circle(),
-                _ => {}
-            },
+            Mode::RecentChat | Mode::Contact | Mode::Setting => {
+                if let Action::NextTab = action {
+                    self.item = self.item.circle()
+                }
+            }
             _ => {}
         }
         Ok(None)
