@@ -82,7 +82,7 @@ impl InputData {
 }
 
 impl Widget for &mut UserInput {
-    fn render(self, area: Rect, buf: &mut Buffer)
+    fn render(self, _area: Rect, _buf: &mut Buffer)
     where
         Self: Sized,
     {

@@ -1,14 +1,26 @@
-use crate::action::Action;
+use crate::action::Action::Alert;
+use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::user_input::{InputData, UserInput};
 use crate::components::{area_util, Component};
+use crate::proxy::HOST;
+use crate::token;
+use crate::token::CURRENT_USER;
+use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::Frame;
-use tracing::info;
+use reqwest::blocking::Client;
+use reqwest::StatusCode;
+use serde::Deserialize;
+use std::thread;
+use std::thread::sleep;
+use std::time::Duration;
+use tokio::task::spawn_blocking;
+use tracing::{error, info};
 
 pub(crate) struct Login {
     mode_holder: ModeHolderLock,
@@ -59,6 +71,88 @@ enum State {
     PasswordEditing,
 }
 
+struct LoginReq {
+    user_name: String,
+    password: String,
+}
+
+#[derive(Deserialize)]
+struct LoginRes {
+    pub access_token: String,
+}
+
+fn do_login(login: LoginReq) -> color_eyre::Result<String> {
+    let login_url = format!("{HOST}/token/login");
+    let client = Client::new();
+    let response = client
+        .post(&login_url)
+        .json(&serde_json::json!({
+            "name": login.user_name,
+            "password": login.password,
+        }))
+        .send();
+
+    match response {
+        Ok(res) => {
+            if res.status().is_success() {
+                match res.json::<LoginRes>() {
+                    Ok(LoginRes { access_token }) => Ok(access_token),
+                    Err(e) => Err(format_err!("Failed to parse response: {}", e)),
+                }
+            } else if res.status() == StatusCode::UNAUTHORIZED {
+                Err(format_err!("用户名或密码错误"))
+            } else {
+                Err(format_err!("Login failed: HTTP {}", res.status()))
+            }
+        }
+        Err(e) => Err(format_err!("Failed to send login request: {}", e)),
+    }
+}
+
+fn renew() {
+    // 启动异步线程，定时刷新token过期时间
+    thread::spawn(move || {
+        loop {
+            let token = match CURRENT_USER.get_user().token.clone() {
+                None => {
+                    break;
+                }
+                Some(token) => token,
+            };
+            let token = format!("Bearer {token}");
+            let renew_token_period = Duration::from_secs(60);
+            sleep(renew_token_period);
+            let renew_url = format!("{HOST}/token/renew");
+            let client = Client::new();
+            let response = client
+                .patch(renew_url)
+                .header("Authorization", token.clone())
+                .send();
+            match response {
+                Ok(res) => {
+                    if res.status().is_success() {
+                        match res.text() {
+                            Ok(t) => {
+                                let token_data = token::parse_token(t.as_str()).unwrap();
+                                info!("user {} ", token_data.claims.name);
+                                CURRENT_USER.set_user(Some(token_data.claims), Some(t));
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to parse response: {}", e);
+                            }
+                        }
+                    } else {
+                        eprintln!("Token refresh failed: HTTP {}", res.status());
+                    }
+                }
+                Err(err) => {
+                    eprintln!("Failed to send token refresh request: {}", err);
+                }
+            }
+        }
+    });
+}
+
 impl Component for Login {
     fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {
         if self.mode_holder.get_mode() == Mode::Login {
@@ -66,7 +160,6 @@ impl Component for Login {
                 State::Normal => {
                     if let KeyCode::Char('e') = key.code {
                         self.next_state();
-                        info!("start editing user");
                     }
                 }
                 State::UserNameEditing => match key.code {
@@ -97,16 +190,30 @@ impl Component for Login {
     }
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
-        if self.mode_holder.get_mode() == Mode::Login {
-            if action == Action::Confirm {
-                // todo!("调用login接口")
-                info!(
-                    "Username: {}, Password: {}",
-                    self.user_name_input.data().unwrap_or("***".to_string()),
-                    self.password_input.data().unwrap_or("***".to_string())
-                );
-                self.mode_holder.set_mode(Mode::RecentChat);
+        if self.mode_holder.get_mode() == Mode::Login && action == Action::Confirm {
+            let user_name = self.user_name_input.data().unwrap();
+            let password = self.password_input.data().unwrap();
+            // 当前环境为异步环境，但是本方法为同步方法，不能在同步方法中直接调用异步方法，但是reqwest的同步客户端无法在异步环境中使用
+            // 因此此处使用tokio的同步方法结合futures的同步执行器获取结果
+            let join_handle = spawn_blocking(|| {
+                do_login(LoginReq {
+                    user_name,
+                    password,
+                })
+            });
+            let result = futures::executor::block_on(join_handle)?;
+            match result {
+                Ok(token) => {
+                    let token_data = token::parse_token(token.as_str()).unwrap();
+                    CURRENT_USER.set_user(Some(token_data.claims), Some(token));
+                    // renew();
+                }
+                Err(err) => {
+                    error!("{:#?}", err);
+                    return Ok(Some(Alert(format!("{:#?}", err), ConfirmEvent::Nothing)));
+                }
             }
+            self.mode_holder.set_mode(Mode::RecentChat);
         }
         Ok(None)
     }

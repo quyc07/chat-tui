@@ -1,4 +1,3 @@
-use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 // ANCHOR: centered_rect

@@ -8,6 +8,8 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Tabs};
 use ratatui::Frame;
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
+use tracing::info;
+use crate::token::CURRENT_USER;
 
 pub(crate) struct Navigation {
     mode_holder: ModeHolderLock,
@@ -77,6 +79,8 @@ impl Component for Navigation {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         match self.mode_holder.get_mode() {
             Mode::RecentChat | Mode::Contact | Mode::Setting => {
+                let name = CURRENT_USER.get_user().user.unwrap().name;
+                info!("CurrentUser: {name}");
                 if let Action::NextTab = action {
                     self.item = self.item.circle()
                 }

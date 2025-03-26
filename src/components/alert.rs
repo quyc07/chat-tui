@@ -1,13 +1,10 @@
 use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
-use crate::components::area_util::centered_rect;
 use crate::components::Component;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Text};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Widget};
+use ratatui::layout::Rect;
+use ratatui::widgets::Widget;
 use ratatui::Frame;
 
 pub struct Alert {
@@ -22,7 +19,7 @@ pub struct Alert {
 }
 
 impl Widget for &mut Alert {
-    fn render(self, area: Rect, buf: &mut Buffer)
+    fn render(self, _area: Rect, _buf: &mut Buffer)
     where
         Self: Sized,
     {
