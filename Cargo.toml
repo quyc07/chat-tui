@@ -44,6 +44,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "serde"] }
 reqwest = { version = "0.12.15", features = ["json", "blocking", "stream"] }
 chrono = "0.4.40"
 jsonwebtoken = "9"
+unicode-width = "0.2.0"
 
 [build-dependencies]
 anyhow = "1.0.90"

@@ -1,6 +1,7 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::{area_util, Component};
+use crate::token::CURRENT_USER;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Color, Style, Stylize};
@@ -8,8 +9,7 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Tabs};
 use ratatui::Frame;
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
-use tracing::info;
-use crate::token::CURRENT_USER;
+use unicode_width::UnicodeWidthStr;
 
 pub(crate) struct Navigation {
     mode_holder: ModeHolderLock,
@@ -31,7 +31,7 @@ enum NavigationItem {
     RecentChat,
     #[strum(to_string = "我的好友")]
     Contact,
-    #[strum(to_string = "设置")]
+    #[strum(to_string = "我的设置")]
     Setting,
 }
 
@@ -80,7 +80,6 @@ impl Component for Navigation {
         match self.mode_holder.get_mode() {
             Mode::RecentChat | Mode::Contact | Mode::Setting => {
                 let name = CURRENT_USER.get_user().user.unwrap().name;
-                info!("CurrentUser: {name}");
                 if let Action::NextTab = action {
                     self.item = self.item.circle()
                 }
@@ -96,27 +95,56 @@ impl Component for Navigation {
             Mode::RecentChat | Mode::Contact | Mode::Setting => {
                 let [navigation_area, _] =
                     Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).areas(area);
-                let navigation_area = area_util::centered_rect(50, 100, navigation_area);
+                let navigation_area = area_util::centered_rect(70, 100, navigation_area);
                 let titles = NavigationItem::iter().map(NavigationItem::title);
                 let highlight_style = (Color::default(), self.item.palette().c700);
                 let selected_tab_index = self.item as usize;
+                let padding = cal_padding(&navigation_area);
                 let tabs = Tabs::new(titles)
                     .block(
                         Block::default()
-                            .borders(Borders::BOTTOM)
-                            .border_style(Style::default().fg(Color::Yellow))
                             .title("Chat-Tui")
                             .title_style(Style::default().fg(Color::Green))
+                            .borders(Borders::BOTTOM)
+                            .border_style(Style::default().fg(Color::Green))
                             .title_alignment(Alignment::Center),
                     )
                     .highlight_style(highlight_style)
                     .select(selected_tab_index)
-                    .padding("     ", "     ")
+                    .padding(" ".repeat(padding), " ".repeat(padding))
                     .divider("-");
                 frame.render_widget(tabs, navigation_area);
             }
             _ => {}
         };
         Ok(())
+    }
+}
+
+fn cal_padding(area: &Rect) -> usize {
+    let width = area.width as usize;
+    let navi_width = NavigationItem::iter()
+        .enumerate()
+        .map(|(_, item)| item.to_string().as_str().width_cjk() + 4)
+        .sum::<usize>()
+        + 2;
+    let len = NavigationItem::iter().len();
+    if width < navi_width {
+        0
+    } else {
+        (width - navi_width) / (len * 2)
+    }
+}
+#[cfg(test)]
+mod tests {
+    use unicode_width::UnicodeWidthStr;
+
+    #[test]
+    fn test_string_width() {
+        let string = String::from("我的好友");
+        let width = UnicodeWidthStr::width(string.as_str());
+        println!("width: {width}, string: {string}");
+        let width = UnicodeWidthStr::width_cjk(string.as_str());
+        println!("width_cjk: {width}, string: {string}");
     }
 }
