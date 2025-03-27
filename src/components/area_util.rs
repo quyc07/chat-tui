@@ -26,5 +26,19 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 // ANCHOR_END: centered_rect
 
 pub(crate) fn total_area(rect: Rect) -> Rect {
-    Rect::new(0, 0, rect.width * 6 / 10, rect.height)
+    centered_rect(70, 100, rect)
+}
+
+pub(crate) fn navigation_area(rect: Rect) -> Rect {
+    let area = total_area(rect);
+    let [navigation_area, _] =
+        Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).areas(area);
+    navigation_area
+}
+
+pub(crate) fn dynamic_area(rect: Rect) -> Rect {
+    let area = total_area(rect);
+    let [_, dynamic_area] =
+        Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).areas(area);
+    dynamic_area
 }

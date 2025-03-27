@@ -2,7 +2,7 @@ use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::{area_util, Component};
 use crate::token::CURRENT_USER;
-use ratatui::layout::{Alignment, Constraint, Layout, Rect};
+use ratatui::layout::{Alignment, Rect};
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::Line;
@@ -93,9 +93,7 @@ impl Component for Navigation {
         let area = area_util::total_area(area);
         match self.mode_holder.get_mode() {
             Mode::RecentChat | Mode::Contact | Mode::Setting => {
-                let [navigation_area, _] =
-                    Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).areas(area);
-                let navigation_area = area_util::centered_rect(70, 100, navigation_area);
+                let navigation_area = area_util::navigation_area(area);
                 let titles = NavigationItem::iter().map(NavigationItem::title);
                 let highlight_style = (Color::default(), self.item.palette().c700);
                 let selected_tab_index = self.item as usize;
