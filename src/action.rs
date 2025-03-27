@@ -23,4 +23,3 @@ pub enum ConfirmEvent {
     Submit,
     Score,
 }
-

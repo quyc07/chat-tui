@@ -2,10 +2,10 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::Component;
 use crossterm::event::KeyEvent;
+use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
-use ratatui::Frame;
 
 pub struct Alert {
     /// alert message
