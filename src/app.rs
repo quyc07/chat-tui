@@ -8,6 +8,7 @@ use tracing::{debug, info};
 
 use crate::components::login::Login;
 use crate::components::navigation::Navigation;
+use crate::components::recent_chat::RecentChat;
 use crate::{
     action::Action,
     components::Component,
@@ -67,10 +68,11 @@ impl App {
         let mode_holder = ModeHolderLock(Arc::new(Mutex::new(ModeHolder::default())));
         let login = Login::new(mode_holder.clone());
         let navigation = Navigation::new(mode_holder.clone());
+        let recent_chat = RecentChat::new(mode_holder.clone());
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(login), Box::new(navigation)],
+            components: vec![Box::new(login), Box::new(navigation), Box::new(recent_chat)],
             should_quit: false,
             should_suspend: false,
             config: Config::new()?,

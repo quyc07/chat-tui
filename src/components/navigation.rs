@@ -1,13 +1,13 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crate::token::CURRENT_USER;
+use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Tabs};
-use ratatui::Frame;
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use unicode_width::UnicodeWidthStr;
 
@@ -122,8 +122,7 @@ impl Component for Navigation {
 fn cal_padding(area: &Rect) -> usize {
     let width = area.width as usize;
     let navi_width = NavigationItem::iter()
-        .enumerate()
-        .map(|(_, item)| item.to_string().as_str().width_cjk() + 4)
+        .map(|item| item.to_string().as_str().width_cjk() + 4)
         .sum::<usize>()
         + 2;
     let len = NavigationItem::iter().len();

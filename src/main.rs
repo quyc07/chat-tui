@@ -9,11 +9,12 @@ mod app;
 mod cli;
 mod components;
 mod config;
+mod datetime;
 mod errors;
 mod logging;
-mod tui;
 mod proxy;
 mod token;
+mod tui;
 
 #[tokio::main]
 async fn main() -> Result<()> {
