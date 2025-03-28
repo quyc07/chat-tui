@@ -6,6 +6,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 
+use crate::components::alert::Alert;
 use crate::components::login::Login;
 use crate::components::navigation::Navigation;
 use crate::components::recent_chat::RecentChat;
@@ -48,6 +49,7 @@ pub enum Mode {
     RecentChat,
     Contact,
     Setting,
+    Alert,
 }
 
 #[derive(Default)]
@@ -81,10 +83,16 @@ impl App {
         let login = Login::new(mode_holder.clone());
         let navigation = Navigation::new(mode_holder.clone());
         let recent_chat = RecentChat::new(mode_holder.clone());
+        let alert = Alert::new(mode_holder.clone());
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(login), Box::new(navigation), Box::new(recent_chat)],
+            components: vec![
+                Box::new(login),
+                Box::new(navigation),
+                Box::new(recent_chat),
+                Box::new(alert),
+            ],
             should_suspend: false,
             config: Config::new()?,
             mode: mode_holder.clone(),

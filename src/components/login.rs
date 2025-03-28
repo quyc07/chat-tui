@@ -1,4 +1,5 @@
 use crate::action::Action::Alert;
+use crate::action::ConfirmEvent::Nothing;
 use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
 use crate::components::user_input::{InputData, UserInput};
@@ -140,15 +141,15 @@ fn renew() {
                                 CURRENT_USER.set_user(Some(token_data.claims), Some(t));
                             }
                             Err(e) => {
-                                eprintln!("Failed to parse response: {}", e);
+                                error!("Failed to parse response: {}", e);
                             }
                         }
                     } else {
-                        eprintln!("Token refresh failed: HTTP {}", res.status());
+                        error!("Token refresh failed: HTTP {}", res.status());
                     }
                 }
                 Err(err) => {
-                    eprintln!("Failed to send token refresh request: {}", err);
+                    error!("Failed to send token refresh request: {}", err);
                 }
             }
         }
@@ -192,7 +193,7 @@ impl Component for Login {
     }
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
-        if self.mode_holder.get_mode() == Mode::Login && action == Action::Confirm {
+        if self.mode_holder.get_mode() == Mode::Login && action == Action::Submit {
             let user_name = self.user_name_input.data().unwrap();
             let password = self.password_input.data().unwrap();
             // 当前环境为异步环境，但是本方法为同步方法，不能在同步方法中直接调用异步方法，但是reqwest的同步客户端无法在异步环境中使用
@@ -211,8 +212,8 @@ impl Component for Login {
                     // renew();
                 }
                 Err(err) => {
-                    error!("{:#?}", err);
-                    return Ok(Some(Alert(format!("{:#?}", err), ConfirmEvent::Nothing)));
+                    error!("login failed, {err}");
+                    return Ok(Some(Alert(format!("{err}"), None)));
                 }
             }
             self.mode_holder.set_mode(Mode::RecentChat);

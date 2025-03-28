@@ -2,7 +2,7 @@
   "keybindings": {
     "Login": {
       "<Ctrl-c>": "Quit",
-      "<Ctrl-s>": "Confirm"
+      "<Ctrl-s>": "Submit"
     },
     "RecentChat": {
       "<Ctrl-c>": "Quit",

@@ -42,3 +42,8 @@ pub(crate) fn dynamic_area(rect: Rect) -> Rect {
         Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).areas(area);
     dynamic_area
 }
+
+pub(crate) fn alert_area(rect: Rect) -> Rect {
+    let area = total_area(rect);
+    centered_rect(80, 50, area)
+}

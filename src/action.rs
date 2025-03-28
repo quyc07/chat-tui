@@ -12,8 +12,9 @@ pub enum Action {
     ClearScreen,
     Error(String),
     Help,
-    Alert(String, ConfirmEvent),
-    Confirm,
+    Alert(String, Option<ConfirmEvent>),
+    Submit,
+    Confirm(ConfirmEvent),
     NextTab,
 }
 
