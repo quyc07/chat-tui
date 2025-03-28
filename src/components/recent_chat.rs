@@ -1,5 +1,5 @@
 use crate::action::Action;
-use crate::app::{Mode, ModeHolderLock};
+use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
 use crate::components::{Component, area_util};
 use crate::datetime::datetime_format;
 use crate::proxy::HOST;
@@ -172,9 +172,10 @@ impl RecentChat {
         let value_clone = self.items.clone();
         tokio::task::spawn_blocking(move || {
             loop {
+                if SHOULD_QUIT.lock().unwrap().should_quit {
+                    break;
+                }
                 if CURRENT_USER.get_user().user.is_some() {
-                    let name = CURRENT_USER.get_user().user.unwrap().name;
-                    info!("User : {name}");
                     // 尽快释放锁，方便数据呈现
                     {
                         let mut value = value_clone.lock().unwrap();

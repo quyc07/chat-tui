@@ -1,20 +1,20 @@
 use crate::action::Action::Alert;
 use crate::action::{Action, ConfirmEvent};
-use crate::app::{Mode, ModeHolderLock};
+use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::proxy::HOST;
 use crate::token;
 use crate::token::CURRENT_USER;
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
-use reqwest::StatusCode;
+use ratatui::Frame;
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::Deserialize;
 use std::thread;
 use std::thread::sleep;
@@ -113,6 +113,10 @@ fn renew() {
     // 启动异步线程，定时刷新token过期时间
     thread::spawn(move || {
         loop {
+            if SHOULD_QUIT.lock().unwrap().should_quit {
+                break;
+            }
+            sleep(Duration::from_secs(60));
             let token = match CURRENT_USER.get_user().token.clone() {
                 None => {
                     break;
@@ -120,8 +124,6 @@ fn renew() {
                 Some(token) => token,
             };
             let token = format!("Bearer {token}");
-            let renew_token_period = Duration::from_secs(60);
-            sleep(renew_token_period);
             let renew_url = format!("{HOST}/token/renew");
             let client = Client::new();
             let response = client

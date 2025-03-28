@@ -49,7 +49,6 @@ pub struct User {
     pub name: String,
     pub email: Option<String>,
     pub phone: Option<String>,
-    pub dgraph_uid: String,
     pub role: Role,
     // 失效时间，timestamp
     exp: i64,
@@ -62,7 +61,6 @@ impl Default for User {
             name: "".to_string(),
             email: None,
             phone: None,
-            dgraph_uid: "".to_string(),
             role: Role::User,
             exp: 0,
         }
