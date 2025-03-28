@@ -17,7 +17,6 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::time::Duration;
-use tracing::info;
 
 pub(crate) struct RecentChat {
     mode_holder: ModeHolderLock,
@@ -196,11 +195,11 @@ impl RecentChat {
 }
 
 impl Component for RecentChat {
-    fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {
+    fn handle_key_event(&mut self, _key: KeyEvent) -> color_eyre::Result<Option<Action>> {
         Ok(None)
     }
 
-    fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
+    fn update(&mut self, _action: Action) -> color_eyre::Result<Option<Action>> {
         Ok(None)
     }
 

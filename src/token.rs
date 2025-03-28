@@ -1,9 +1,6 @@
-use chrono::{DateTime, Local};
-use jsonwebtoken::{DecodingKey, EncodingKey, TokenData, Validation, decode};
+use jsonwebtoken::{decode, DecodingKey, EncodingKey, TokenData, Validation};
 use serde::{Deserialize, Serialize};
-use std::ops::Add;
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::Duration;
 
 // 存储当前用户信息
 pub(crate) static CURRENT_USER: LazyLock<CurrentUserLock> = LazyLock::new(|| {
@@ -73,17 +70,6 @@ pub enum Role {
     Admin,
 }
 
-const SECOND_TO_EXPIRED: u64 = 60;
-fn expire_timestamp() -> i64 {
-    Local::now()
-        .add(Duration::from_secs(SECOND_TO_EXPIRED))
-        .timestamp()
-}
-
-fn expire() -> DateTime<Local> {
-    Local::now().add(Duration::from_secs(SECOND_TO_EXPIRED))
-}
-
 pub(crate) fn parse_token(token: &str) -> Result<TokenData<User>, String> {
     let mut validation = Validation::default();
     // 修改leeway=0，让exp校验使用绝对时间，参考Validation.leeway的使用
@@ -92,14 +78,12 @@ pub(crate) fn parse_token(token: &str) -> Result<TokenData<User>, String> {
 }
 
 struct Keys {
-    pub(crate) encoding: EncodingKey,
     pub(crate) decoding: DecodingKey,
 }
 
 impl Keys {
     fn new(secret: &[u8]) -> Self {
         Self {
-            encoding: EncodingKey::from_secret(secret),
             decoding: DecodingKey::from_secret(secret),
         }
     }

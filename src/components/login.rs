@@ -1,6 +1,5 @@
+use crate::action::Action;
 use crate::action::Action::Alert;
-use crate::action::ConfirmEvent::Nothing;
-use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
 use crate::components::user_input::{InputData, UserInput};
 use crate::components::{area_util, Component};
@@ -21,7 +20,7 @@ use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
 use tokio::task::spawn_blocking;
-use tracing::{error, info};
+use tracing::error;
 
 pub(crate) struct Login {
     mode_holder: ModeHolderLock,

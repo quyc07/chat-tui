@@ -31,36 +31,34 @@ impl Widget for &mut Alert {
     where
         Self: Sized,
     {
-        match self.mode_holder.get_mode() {
-            Mode::Alert => {
-                let area = area_util::alert_area(area);
-                let [_, alert_area, _] = Layout::vertical([
-                    Constraint::Fill(1),
-                    Constraint::Length(4),
-                    Constraint::Fill(1),
-                ])
+        if self.mode_holder.get_mode() == Mode::Alert {
+            let area = area_util::alert_area(area);
+            let [_, alert_area, _] = Layout::vertical([
+                Constraint::Fill(1),
+                Constraint::Length(4),
+                Constraint::Fill(1),
+            ])
                 .areas(area);
-                Clear.render(alert_area, buf);
-                let [help_area, msg_area] =
-                    Layout::vertical([Constraint::Length(1), Constraint::Length(3)])
-                        .areas(alert_area);
-                let msg = match self.confirm_event {
-                    None => "Esc to quit.",
-                    Some(_) => "Esc to quit, Enter to submit.",
-                };
-                let (msg, style) = (vec![msg.into()], Style::default());
-                let text = Text::from(Line::from(msg)).patch_style(style);
-                let help_message = Paragraph::new(text);
-                help_message.render(help_area, buf);
-                let msg = Paragraph::new(self.msg.as_str())
-                    .style(Style::default().fg(Color::Yellow))
-                    .block(Block::default().borders(Borders::ALL));
-                msg.render(msg_area, buf);
-            }
-            _ => {}
+            Clear.render(alert_area, buf);
+            let [help_area, msg_area] =
+                Layout::vertical([Constraint::Length(1), Constraint::Length(3)])
+                    .areas(alert_area);
+            let msg = match self.confirm_event {
+                None => "Esc to quit.",
+                Some(_) => "Esc to quit, Enter to submit.",
+            };
+            let (msg, style) = (vec![msg.into()], Style::default());
+            let text = Text::from(Line::from(msg)).patch_style(style);
+            let help_message = Paragraph::new(text);
+            help_message.render(help_area, buf);
+            let msg = Paragraph::new(self.msg.as_str())
+                .style(Style::default().fg(Color::Yellow))
+                .block(Block::default().borders(Borders::ALL));
+            msg.render(msg_area, buf);
         }
     }
 }
+
 
 impl Component for Alert {
     fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {

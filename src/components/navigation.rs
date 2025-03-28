@@ -79,7 +79,6 @@ impl Component for Navigation {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         match self.mode_holder.get_mode() {
             Mode::RecentChat | Mode::Contact | Mode::Setting => {
-                let name = CURRENT_USER.get_user().user.unwrap().name;
                 if let Action::NextTab = action {
                     self.item = self.item.circle()
                 }
