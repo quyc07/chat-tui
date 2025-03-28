@@ -231,7 +231,7 @@ impl Component for Login {
         let area = area_util::total_area(area);
         frame.render_widget(bg_block, area);
 
-        let [cli_name_area, help_area, user_name_area, password_area, _] = Layout::default()
+        let [banner_area, help_area, user_name_area, password_area, _] = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Min(1),
@@ -242,15 +242,7 @@ impl Component for Login {
             ])
             .areas(area);
 
-        let banner = r#"
- ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░▒▓████████▓▒░▒▓██████▓▒░░▒▓█▓▒░      ░▒▓█▓▒░
-░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░  ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░
-░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░  ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░
-░▒▓█▓▒░      ░▒▓████████▓▒░▒▓████████▓▒░ ░▒▓█▓▒░  ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░
-░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░  ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░
-░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░  ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░
- ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░   ░▒▓██████▓▒░░▒▓████████▓▒░▒▓█▓▒░
-        "#;
+        let banner = include_str!("../../banner.txt");
 
         let banner_paragraph = Paragraph::new(banner)
             .block(Block::default().borders(Borders::NONE))
@@ -258,7 +250,7 @@ impl Component for Login {
 
         frame.render_widget(
             banner_paragraph,
-            area_util::centered_rect(100, 50, cli_name_area),
+            area_util::centered_rect(100, 50, banner_area),
         );
 
         let (msg, style) = match self.state {
