@@ -137,7 +137,6 @@ fn renew() {
                         match res.text() {
                             Ok(t) => {
                                 let token_data = token::parse_token(t.as_str()).unwrap();
-                                info!("user {} ", token_data.claims.name);
                                 CURRENT_USER.set_user(Some(token_data.claims), Some(t));
                             }
                             Err(e) => {
@@ -209,7 +208,7 @@ impl Component for Login {
                 Ok(token) => {
                     let token_data = token::parse_token(token.as_str()).unwrap();
                     CURRENT_USER.set_user(Some(token_data.claims), Some(token));
-                    // renew();
+                    renew();
                 }
                 Err(err) => {
                     error!("login failed, {err}");
