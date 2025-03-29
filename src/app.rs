@@ -48,6 +48,7 @@ pub enum Mode {
     #[default]
     Login,
     RecentChat,
+    Chat,
     Contact,
     Setting,
     Alert,

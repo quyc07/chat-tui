@@ -8,16 +8,19 @@ use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
-use crossterm::event::KeyEvent;
-use ratatui::layout::Rect;
+use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
 use ratatui::style::Stylize;
-use ratatui::widgets::{Block, Borders, List, ListItem};
+use ratatui::widgets::{
+    Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
+};
 use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
+use tracing::info;
 
 static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> =
     LazyLock::new(|| Arc::new(Mutex::new(ChatVoHolder { chat_vo: None })));
@@ -45,6 +48,13 @@ impl ChatVoHolder {
 pub(crate) struct Chat {
     mode_holder: ModeHolderLock,
     chat_history: Vec<ChatHistory>,
+    scroll_bar: ScrollBar,
+}
+
+#[derive(Default)]
+struct ScrollBar {
+    vertical_scroll_state: ScrollbarState,
+    vertical_scroll: usize,
 }
 
 impl Chat {
@@ -52,15 +62,63 @@ impl Chat {
         Self {
             mode_holder,
             chat_history: Vec::new(),
+            scroll_bar: ScrollBar::default(),
+        }
+    }
+
+    fn fetch_history(&mut self, chat_vo: ChatVo) -> color_eyre::Result<Option<Action>> {
+        match chat_vo {
+            ChatVo::User { uid, user_name, .. } => {
+                match proxy::send_request(move || fetch_user_history(uid))? {
+                    Ok(chat_history) => {
+                        let last_mid = chat_history.last().unwrap().mid;
+                        self.chat_history = chat_history
+                            .into_iter()
+                            .map(|m| ChatHistory::User(m))
+                            .collect();
+                        // 更新 已读索引
+                        proxy::send_request(move || {
+                            set_read_index(UpdateReadIndex::User {
+                                target_uid: uid,
+                                mid: last_mid,
+                            })
+                                .expect("fail to set read index");
+                        })?;
+                        Ok(None)
+                    }
+                    Err(err) => Err(format_err!("Failed to fetch chat history:{}", err)),
+                }
+            }
+            ChatVo::Group {
+                gid, group_name, ..
+            } => {
+                match proxy::send_request(move || fetch_group_history(gid))? {
+                    Ok(chat_history) => {
+                        let last_mid = chat_history.last().unwrap().mid;
+                        self.chat_history = chat_history
+                            .into_iter()
+                            .map(|m| ChatHistory::Group(m))
+                            .collect();
+                        // 更新 已读索引
+                        proxy::send_request(move || {
+                            set_read_index(UpdateReadIndex::Group {
+                                target_gid: gid,
+                                mid: last_mid,
+                            })
+                                .expect("fail to set read index");
+                        })?;
+                        Ok(None)
+                    }
+                    Err(err) => Err(format_err!("Failed to fetch chat history:{}", err)),
+                }
+            }
         }
     }
 }
 
-impl From<&ChatHistory> for Text<'_> {
-    fn from(value: &ChatHistory) -> Self {
-        let current_user = CURRENT_USER.get_user().user.unwrap();
-
-        match value {
+impl ChatHistory {
+    fn convert_lines(&self) -> Vec<Line> {
+        match self {
             ChatHistory::User(UserHistoryMsg {
                                   mid: _mid,
                                   msg,
@@ -68,7 +126,7 @@ impl From<&ChatHistory> for Text<'_> {
                                   from_uid,
                               }) => {
                 let target_name = CHAT_VO.lock().unwrap().get_target_name();
-                let content = vec![
+                vec![
                     Line::from(Span::styled(
                         format!("{target_name} {time}\n"),
                         Style::default().fg(Color::LightBlue),
@@ -77,8 +135,7 @@ impl From<&ChatHistory> for Text<'_> {
                         format!("{msg}"),
                         Style::default().fg(crate::components::recent_chat::TEXT_FG_COLOR),
                     )),
-                ];
-                Self::from(content)
+                ]
             }
             ChatHistory::Group(GroupHistoryMsg {
                                    mid: _mid,
@@ -87,7 +144,7 @@ impl From<&ChatHistory> for Text<'_> {
                                    from_uid,
                                    name_of_from_uid,
                                }) => {
-                let content = vec![
+                vec![
                     Line::from(Span::styled(
                         format!("{name_of_from_uid} {time}\n"),
                         Style::default().fg(Color::LightBlue),
@@ -96,8 +153,7 @@ impl From<&ChatHistory> for Text<'_> {
                         format!("{msg}"),
                         Style::default().fg(crate::components::recent_chat::TEXT_FG_COLOR),
                     )),
-                ];
-                Self::from(content)
+                ]
             }
         }
     }
@@ -105,89 +161,105 @@ impl From<&ChatHistory> for Text<'_> {
 
 impl Component for Chat {
     fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {
+        if self.mode_holder.get_mode() != Mode::Chat {
+            return Ok(None);
+        }
+        match key.code {
+            KeyCode::Esc => {
+                self.mode_holder.set_mode(Mode::RecentChat);
+            }
+            KeyCode::Down => {
+                self.scroll_bar.vertical_scroll = self.scroll_bar.vertical_scroll.saturating_add(1);
+                self.scroll_bar.vertical_scroll_state = self
+                    .scroll_bar
+                    .vertical_scroll_state
+                    .position(self.scroll_bar.vertical_scroll);
+            }
+            KeyCode::Up => {
+                self.scroll_bar.vertical_scroll = self.scroll_bar.vertical_scroll.saturating_sub(1);
+                self.scroll_bar.vertical_scroll_state = self
+                    .scroll_bar
+                    .vertical_scroll_state
+                    .position(self.scroll_bar.vertical_scroll);
+            }
+            KeyCode::Char('e') => {
+                info!("chat editing");
+            }
+            _ => {}
+        }
         Ok(None)
     }
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
-        if self.mode_holder.get_mode() != Mode::RecentChat {
-            return Ok(None);
-        }
         match action {
             Action::Chat(chat_vo) => {
                 CHAT_VO.lock().unwrap().set_chat_vo(chat_vo.clone());
-
-                match chat_vo {
-                    ChatVo::User { uid, user_name, .. } => {
-                        match proxy::send_request(move || fetch_user_history(uid))? {
-                            Ok(chat_history) => {
-                                let last_mid = chat_history.last().unwrap().mid;
-                                self.chat_history = chat_history
-                                    .into_iter()
-                                    .map(|m| ChatHistory::User(m))
-                                    .collect();
-                                // 更新 已读索引
-                                proxy::send_request(move || {
-                                    set_read_index(UpdateReadIndex::User {
-                                        target_uid: uid,
-                                        mid: last_mid,
-                                    })
-                                        .expect("fail to set read index");
-                                })?;
-                                Ok(None)
-                            }
-                            Err(err) => Err(format_err!("Failed to fetch chat history:{}", err)),
-                        }
-                    }
-                    ChatVo::Group {
-                        gid, group_name, ..
-                    } => {
-                        match proxy::send_request(move || fetch_group_history(gid))? {
-                            Ok(chat_history) => {
-                                let last_mid = chat_history.last().unwrap().mid;
-                                self.chat_history = chat_history
-                                    .into_iter()
-                                    .map(|m| ChatHistory::Group(m))
-                                    .collect();
-                                // 更新 已读索引
-                                proxy::send_request(move || {
-                                    set_read_index(UpdateReadIndex::Group {
-                                        target_gid: gid,
-                                        mid: last_mid,
-                                    })
-                                        .expect("fail to set read index");
-                                })?;
-                                Ok(None)
-                            }
-                            Err(err) => Err(format_err!("Failed to fetch chat history:{}", err)),
-                        }
-                    }
-                }
+                self.fetch_history(chat_vo)
             }
             _ => Ok(None),
         }
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
-        if self.mode_holder.get_mode() != Mode::RecentChat {
-            return Ok(());
-        }
-        let area = area_util::chat(area);
-        let block = Block::new()
-            .borders(Borders::ALL)
-            .border_set(symbols::border::ROUNDED)
-            .border_style(crate::components::recent_chat::TODO_HEADER_STYLE)
-            .bg(crate::components::recent_chat::NORMAL_ROW_BG);
-        // Iterate through all elements in the `items` and stylize them.
-        let items: Vec<ListItem> = self
-            .chat_history
-            .iter()
-            .enumerate()
-            .map(|(i, chat_history)| ListItem::new(Text::from(chat_history)))
-            .collect();
+        match self.mode_holder.get_mode() {
+            Mode::RecentChat | Mode::Chat => {
+                let area = area_util::chat(area);
+                let [chat_history_area, chat_area] =
+                    Layout::vertical([Constraint::Fill(1), Constraint::Length(6)]).areas(area);
+                let block = Block::new()
+                    .borders(Borders::ALL)
+                    .border_set(symbols::border::ROUNDED)
+                    .border_style(crate::components::recent_chat::TODO_HEADER_STYLE)
+                    .bg(crate::components::recent_chat::NORMAL_ROW_BG);
+                // Iterate through all elements in the `items` and stylize them.
+                let items = self
+                    .chat_history
+                    .iter()
+                    .map(|chat_history| chat_history.convert_lines())
+                    .flatten()
+                    .collect::<Vec<_>>();
+                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(Some("↑"))
+                    .end_symbol(Some("↓"));
 
-        // Create a List from all list items and highlight the currently selected one
-        let list = List::new(items).block(block);
-        frame.render_widget(list, area);
+                self.scroll_bar.vertical_scroll_state = self
+                    .scroll_bar
+                    .vertical_scroll_state
+                    .content_length(items.len());
+                // Create a List from all list items and highlight the currently selected one
+                let chat_history = Paragraph::new(items)
+                    .block(block)
+                    .scroll((self.scroll_bar.vertical_scroll as u16, 0));
+                frame.render_widget(
+                    chat_history,
+                    chat_history_area.inner(Margin {
+                        horizontal: 1,
+                        vertical: 0,
+                    }),
+                );
+                // and the scrollbar, those are separate widgets
+                frame.render_stateful_widget(
+                    scrollbar,
+                    chat_history_area.inner(Margin {
+                        // using an inner vertical margin of 1 unit makes the scrollbar inside the block
+                        vertical: 1,
+                        horizontal: 0,
+                    }),
+                    &mut self.scroll_bar.vertical_scroll_state,
+                );
+                let block = Block::new()
+                    .borders(Borders::ALL)
+                    .border_set(symbols::border::ROUNDED)
+                    .border_style(crate::components::recent_chat::TODO_HEADER_STYLE)
+                    .bg(crate::components::recent_chat::NORMAL_ROW_BG);
+                frame.render_widget(block, chat_area.inner(Margin {
+                    // using an inner vertical margin of 1 unit makes the scrollbar inside the block
+                    vertical: 0,
+                    horizontal: 1,
+                }));
+            }
+            _ => {}
+        }
         Ok(())
     }
 }

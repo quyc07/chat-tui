@@ -1,13 +1,12 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
-use crate::components::{Component, area_util};
-use crate::token::CURRENT_USER;
-use ratatui::Frame;
+use crate::components::{area_util, Component};
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Tabs};
+use ratatui::Frame;
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use unicode_width::UnicodeWidthStr;
 
@@ -90,7 +89,7 @@ impl Component for Navigation {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
         match self.mode_holder.get_mode() {
-            Mode::RecentChat | Mode::Contact | Mode::Setting => {
+            Mode::RecentChat | Mode::Chat | Mode::Contact | Mode::Setting => {
                 let navigation_area = area_util::navigation_area(area);
                 let titles = NavigationItem::iter().map(NavigationItem::title);
                 let highlight_style = (Color::default(), self.item.palette().c700);

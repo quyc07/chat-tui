@@ -227,6 +227,10 @@ impl Component for RecentChat {
                 self.list_state.select_last();
                 self.send_chat()
             }
+            KeyCode::Enter => {
+                self.mode_holder.set_mode(Mode::Chat);
+                Ok(None)
+            }
             _ => Ok(None),
         }
     }
@@ -239,39 +243,40 @@ impl Component for RecentChat {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
-        if self.mode_holder.get_mode() != Mode::RecentChat {
-            return Ok(());
+        match self.mode_holder.get_mode() {
+            Mode::RecentChat | Mode::Chat => {
+                let area = area_util::recent_chat(area);
+                let block = Block::new()
+                    .borders(Borders::ALL)
+                    .border_set(symbols::border::ROUNDED)
+                    .border_style(TODO_HEADER_STYLE)
+                    .bg(NORMAL_ROW_BG);
+
+                // Iterate through all elements in the `items` and stylize them.
+                let items: Vec<ListItem> = self
+                    .items
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, chat_vo)| {
+                        let color = alternate_colors(i);
+                        ListItem::new(Text::from(chat_vo)).bg(color)
+                    })
+                    .collect();
+
+                // Create a List from all list items and highlight the currently selected one
+                let list = List::new(items)
+                    .block(block)
+                    .highlight_style(SELECTED_STYLE)
+                    .highlight_spacing(HighlightSpacing::Always);
+
+                // We need to disambiguate this trait method as both `Widget` and `StatefulWidget` share the
+                // same method name `render`.
+                frame.render_stateful_widget(list, area, &mut self.list_state);
+            }
+            _ => {}
         }
-        let area = area_util::recent_chat(area);
-        let block = Block::new()
-            .borders(Borders::ALL)
-            .border_set(symbols::border::ROUNDED)
-            .border_style(TODO_HEADER_STYLE)
-            .bg(NORMAL_ROW_BG);
-
-        // Iterate through all elements in the `items` and stylize them.
-        let items: Vec<ListItem> = self
-            .items
-            .lock()
-            .unwrap()
-            .iter()
-            .enumerate()
-            .map(|(i, chat_vo)| {
-                let color = alternate_colors(i);
-                ListItem::new(Text::from(chat_vo)).bg(color)
-            })
-            .collect();
-
-        // Create a List from all list items and highlight the currently selected one
-        let list = List::new(items)
-            .block(block)
-            .highlight_style(SELECTED_STYLE)
-            .highlight_symbol(">")
-            .highlight_spacing(HighlightSpacing::Always);
-
-        // We need to disambiguate this trait method as both `Widget` and `StatefulWidget` share the
-        // same method name `render`.
-        frame.render_stateful_widget(list, area, &mut self.list_state);
         Ok(())
     }
 }
