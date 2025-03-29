@@ -1,6 +1,7 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::ChatVo;
+use crate::components::user_input::{InputData, UserInput};
 use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy;
@@ -9,18 +10,17 @@ use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::prelude::{Color, Line, Span, Style, Text};
+use ratatui::layout::{Alignment, Constraint, Layout, Margin, Rect};
+use ratatui::prelude::{Color, Line, Span, Style};
 use ratatui::style::Stylize;
 use ratatui::widgets::{
-    Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
+    Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
 };
 use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
-use tracing::info;
 
 static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> =
     LazyLock::new(|| Arc::new(Mutex::new(ChatVoHolder { chat_vo: None })));
@@ -49,6 +49,15 @@ pub(crate) struct Chat {
     mode_holder: ModeHolderLock,
     chat_history: Vec<ChatHistory>,
     scroll_bar: ScrollBar,
+    user_input: UserInput,
+    chat_state: ChatState,
+}
+
+#[derive(Eq, PartialEq, Default)]
+enum ChatState {
+    #[default]
+    History,
+    Chat,
 }
 
 #[derive(Default)]
@@ -63,6 +72,11 @@ impl Chat {
             mode_holder,
             chat_history: Vec::new(),
             scroll_bar: ScrollBar::default(),
+            user_input: UserInput::new(InputData::ChatMsg {
+                label: Some("Press e to edit msg".to_string()),
+                data: None,
+            }),
+            chat_state: Default::default(),
         }
     }
 
@@ -82,7 +96,7 @@ impl Chat {
                                 target_uid: uid,
                                 mid: last_mid,
                             })
-                                .expect("fail to set read index");
+                            .expect("fail to set read index");
                         })?;
                         Ok(None)
                     }
@@ -105,7 +119,7 @@ impl Chat {
                                 target_gid: gid,
                                 mid: last_mid,
                             })
-                                .expect("fail to set read index");
+                            .expect("fail to set read index");
                         })?;
                         Ok(None)
                     }
@@ -120,11 +134,11 @@ impl ChatHistory {
     fn convert_lines(&self) -> Vec<Line> {
         match self {
             ChatHistory::User(UserHistoryMsg {
-                                  mid: _mid,
-                                  msg,
-                                  time,
-                                  from_uid,
-                              }) => {
+                mid: _mid,
+                msg,
+                time,
+                from_uid,
+            }) => {
                 let target_name = CHAT_VO.lock().unwrap().get_target_name();
                 vec![
                     Line::from(Span::styled(
@@ -138,12 +152,12 @@ impl ChatHistory {
                 ]
             }
             ChatHistory::Group(GroupHistoryMsg {
-                                   mid: _mid,
-                                   msg,
-                                   time,
-                                   from_uid,
-                                   name_of_from_uid,
-                               }) => {
+                mid: _mid,
+                msg,
+                time,
+                from_uid,
+                name_of_from_uid,
+            }) => {
                 vec![
                     Line::from(Span::styled(
                         format!("{name_of_from_uid} {time}\n"),
@@ -183,7 +197,8 @@ impl Component for Chat {
                     .position(self.scroll_bar.vertical_scroll);
             }
             KeyCode::Char('e') => {
-                info!("chat editing");
+                // fixme
+                self.chat_state = ChatState::Chat;
             }
             _ => {}
         }
@@ -207,11 +222,10 @@ impl Component for Chat {
                 let [chat_history_area, chat_area] =
                     Layout::vertical([Constraint::Fill(1), Constraint::Length(6)]).areas(area);
                 let block = Block::new()
+                    .title("Press ↑↓ To Scroll.")
+                    .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
-                    .border_set(symbols::border::ROUNDED)
-                    .border_style(crate::components::recent_chat::TODO_HEADER_STYLE)
-                    .bg(crate::components::recent_chat::NORMAL_ROW_BG);
-                // Iterate through all elements in the `items` and stylize them.
+                    .border_set(symbols::border::ROUNDED);
                 let items = self
                     .chat_history
                     .iter()
@@ -226,7 +240,6 @@ impl Component for Chat {
                     .scroll_bar
                     .vertical_scroll_state
                     .content_length(items.len());
-                // Create a List from all list items and highlight the currently selected one
                 let chat_history = Paragraph::new(items)
                     .block(block)
                     .scroll((self.scroll_bar.vertical_scroll as u16, 0));
@@ -237,26 +250,27 @@ impl Component for Chat {
                         vertical: 0,
                     }),
                 );
-                // and the scrollbar, those are separate widgets
                 frame.render_stateful_widget(
                     scrollbar,
                     chat_history_area.inner(Margin {
-                        // using an inner vertical margin of 1 unit makes the scrollbar inside the block
                         vertical: 1,
                         horizontal: 0,
                     }),
                     &mut self.scroll_bar.vertical_scroll_state,
                 );
                 let block = Block::new()
+                    .title(self.user_input.input_data.label())
+                    .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
-                    .border_set(symbols::border::ROUNDED)
-                    .border_style(crate::components::recent_chat::TODO_HEADER_STYLE)
-                    .bg(crate::components::recent_chat::NORMAL_ROW_BG);
-                frame.render_widget(block, chat_area.inner(Margin {
-                    // using an inner vertical margin of 1 unit makes the scrollbar inside the block
-                    vertical: 0,
-                    horizontal: 1,
-                }));
+                    .border_set(symbols::border::ROUNDED);
+                let user_name =
+                    Paragraph::new(self.user_input.input.clone().unwrap_or("start to chat".to_string()))
+                        .style(self.user_input.select_style())
+                        .block(block);
+                frame.render_widget(user_name, chat_area);
+                if self.chat_state == ChatState::Chat {
+                    self.user_input.set_cursor_position(chat_area)
+                }
             }
             _ => {}
         }

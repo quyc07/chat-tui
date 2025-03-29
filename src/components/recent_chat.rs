@@ -7,8 +7,8 @@ use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::layout::Rect;
-use ratatui::style::palette::tailwind::{BLUE, GREEN, SLATE, TEAL};
+use ratatui::layout::{Alignment, Rect};
+use ratatui::style::palette::tailwind::{BLUE, GREEN, SKY, SLATE};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState};
@@ -247,10 +247,12 @@ impl Component for RecentChat {
             Mode::RecentChat | Mode::Chat => {
                 let area = area_util::recent_chat(area);
                 let block = Block::new()
+                    .title("Press Enter To Start Chat.")
+                    .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
-                    .border_set(symbols::border::ROUNDED)
-                    .border_style(TODO_HEADER_STYLE)
-                    .bg(NORMAL_ROW_BG);
+                    .border_set(symbols::border::ROUNDED);
+                // .border_style(TODO_HEADER_STYLE)
+                // .bg(NORMAL_ROW_BG);
 
                 // Iterate through all elements in the `items` and stylize them.
                 let items: Vec<ListItem> = self
@@ -260,8 +262,7 @@ impl Component for RecentChat {
                     .iter()
                     .enumerate()
                     .map(|(i, chat_vo)| {
-                        let color = alternate_colors(i);
-                        ListItem::new(Text::from(chat_vo)).bg(color)
+                        ListItem::new(Text::from(chat_vo))
                     })
                     .collect();
 
@@ -292,6 +293,6 @@ const fn alternate_colors(i: usize) -> Color {
 pub(crate) const TODO_HEADER_STYLE: Style = Style::new().fg(SLATE.c100).bg(BLUE.c800);
 pub(crate) const NORMAL_ROW_BG: Color = SLATE.c200;
 const ALT_ROW_BG_COLOR: Color = SLATE.c300;
-pub(crate) const SELECTED_STYLE: Style = Style::new().bg(TEAL.c200).add_modifier(Modifier::BOLD);
+pub(crate) const SELECTED_STYLE: Style = Style::new().bg(SKY.c200).add_modifier(Modifier::BOLD);
 pub(crate) const TEXT_FG_COLOR: Color = SLATE.c600;
 const COMPLETED_TEXT_FG_COLOR: Color = GREEN.c500;
