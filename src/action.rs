@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use strum::Display;
+use crate::components::recent_chat::ChatVo;
 
 #[derive(Debug, Clone, PartialEq, Eq, Display, Serialize, Deserialize)]
 pub enum Action {
@@ -16,6 +17,7 @@ pub enum Action {
     Submit,
     Confirm(ConfirmEvent),
     NextTab,
+    Chat(ChatVo)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Display, Serialize, Deserialize)]

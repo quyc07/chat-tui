@@ -1,18 +1,18 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::palette::tailwind::{BLUE, GREEN, SLATE, TEAL};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
@@ -25,8 +25,8 @@ pub(crate) struct RecentChat {
 }
 
 /// 聊天记录
-#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
-enum ChatVo {
+#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq, Clone)]
+pub(crate) enum ChatVo {
     /// UserChat
     User {
         /// id of friend
@@ -192,14 +192,49 @@ impl RecentChat {
             }
         });
     }
+
+    fn send_chat(&mut self) -> color_eyre::Result<Option<Action>> {
+        let chat_vos = self.items.lock().unwrap();
+        match self.list_state.selected() {
+            Some(i) if i < chat_vos.len() => {
+                let chat_vo = chat_vos.get(i).unwrap();
+                Ok(Some(Action::Chat(chat_vo.clone())))
+            }
+            _ => Ok(None),
+        }
+    }
 }
 
 impl Component for RecentChat {
-    fn handle_key_event(&mut self, _key: KeyEvent) -> color_eyre::Result<Option<Action>> {
-        Ok(None)
+    fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {
+        if self.mode_holder.get_mode() != Mode::RecentChat {
+            return Ok(None);
+        }
+        match key.code {
+            KeyCode::Down => {
+                self.list_state.select_next();
+                self.send_chat()
+            }
+            KeyCode::Up => {
+                self.list_state.select_previous();
+                self.send_chat()
+            }
+            KeyCode::Home => {
+                self.list_state.select_first();
+                self.send_chat()
+            }
+            KeyCode::End => {
+                self.list_state.select_last();
+                self.send_chat()
+            }
+            _ => Ok(None),
+        }
     }
 
     fn update(&mut self, _action: Action) -> color_eyre::Result<Option<Action>> {
+        if self.mode_holder.get_mode() != Mode::RecentChat {
+            return Ok(None);
+        }
         Ok(None)
     }
 
@@ -249,9 +284,9 @@ const fn alternate_colors(i: usize) -> Color {
     }
 }
 
-const TODO_HEADER_STYLE: Style = Style::new().fg(SLATE.c100).bg(BLUE.c800);
-const NORMAL_ROW_BG: Color = SLATE.c200;
+pub(crate) const TODO_HEADER_STYLE: Style = Style::new().fg(SLATE.c100).bg(BLUE.c800);
+pub(crate) const NORMAL_ROW_BG: Color = SLATE.c200;
 const ALT_ROW_BG_COLOR: Color = SLATE.c300;
-const SELECTED_STYLE: Style = Style::new().bg(TEAL.c200).add_modifier(Modifier::BOLD);
-const TEXT_FG_COLOR: Color = SLATE.c600;
+pub(crate) const SELECTED_STYLE: Style = Style::new().bg(TEAL.c200).add_modifier(Modifier::BOLD);
+pub(crate) const TEXT_FG_COLOR: Color = SLATE.c600;
 const COMPLETED_TEXT_FG_COLOR: Color = GREEN.c500;

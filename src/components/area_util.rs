@@ -51,6 +51,14 @@ pub(crate) fn recent_chat(rect: Rect) -> Rect {
     recent_chat_area
 }
 
+pub(crate) fn chat(rect: Rect) -> Rect {
+    let dynamic_area = dynamic_area(rect);
+    let [_, chat_area ] =
+        Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
+            .areas(dynamic_area);
+    chat_area
+}
+
 pub(crate) fn alert_area(rect: Rect) -> Rect {
     let area = total_area(rect);
     centered_rect(80, 50, area)

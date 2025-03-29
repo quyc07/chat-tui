@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info};
 
 use crate::components::alert::Alert;
+use crate::components::chat::Chat;
 use crate::components::login::Login;
 use crate::components::navigation::Navigation;
 use crate::components::recent_chat::RecentChat;
@@ -84,6 +85,7 @@ impl App {
         let navigation = Navigation::new(mode_holder.clone());
         let recent_chat = RecentChat::new(mode_holder.clone());
         let alert = Alert::new(mode_holder.clone());
+        let chat = Chat::new(mode_holder.clone());
         Ok(Self {
             tick_rate,
             frame_rate,
@@ -92,6 +94,7 @@ impl App {
                 Box::new(navigation),
                 Box::new(recent_chat),
                 Box::new(alert),
+                Box::new(chat),
             ],
             should_suspend: false,
             config: Config::new()?,
