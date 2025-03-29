@@ -207,7 +207,7 @@ impl Component for RecentChat {
         if self.mode_holder.get_mode() != Mode::RecentChat {
             return Ok(());
         }
-        let area = area_util::dynamic_area(area);
+        let area = area_util::recent_chat(area);
         let block = Block::new()
             .borders(Borders::ALL)
             .border_set(symbols::border::ROUNDED)

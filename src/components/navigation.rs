@@ -89,7 +89,6 @@ impl Component for Navigation {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
-        let area = area_util::total_area(area);
         match self.mode_holder.get_mode() {
             Mode::RecentChat | Mode::Contact | Mode::Setting => {
                 let navigation_area = area_util::navigation_area(area);
