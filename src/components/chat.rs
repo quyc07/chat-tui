@@ -9,8 +9,9 @@ use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
+use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::layout::{Alignment, Constraint, Layout, Margin, Rect};
+use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style};
 use ratatui::style::Stylize;
 use ratatui::widgets::{
@@ -22,15 +23,15 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 
-static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> =
+pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> =
     LazyLock::new(|| Arc::new(Mutex::new(ChatVoHolder { chat_vo: None })));
 
-struct ChatVoHolder {
+pub(crate) struct ChatVoHolder {
     chat_vo: Option<ChatVo>,
 }
 
 impl ChatVoHolder {
-    fn set_chat_vo(&mut self, chat_vo: ChatVo) {
+    pub(crate) fn set_chat_vo(&mut self, chat_vo: ChatVo) {
         self.chat_vo = Some(chat_vo);
     }
 
@@ -143,11 +144,11 @@ impl ChatHistory {
                 vec![
                     Line::from(Span::styled(
                         format!("{target_name} {time}\n"),
-                        Style::default().fg(Color::LightBlue),
+                        Style::default().fg(Color::White),
                     )),
                     Line::from(Span::styled(
                         format!("{msg}"),
-                        Style::default().fg(crate::components::recent_chat::TEXT_FG_COLOR),
+                        Style::default().fg(Color::Green),
                     )),
                 ]
             }
@@ -161,11 +162,11 @@ impl ChatHistory {
                 vec![
                     Line::from(Span::styled(
                         format!("{name_of_from_uid} {time}\n"),
-                        Style::default().fg(Color::LightBlue),
+                        Style::default().fg(Color::White),
                     )),
                     Line::from(Span::styled(
                         format!("{msg}"),
-                        Style::default().fg(crate::components::recent_chat::TEXT_FG_COLOR),
+                        Style::default().fg(Color::Green),
                     )),
                 ]
             }
@@ -205,10 +206,11 @@ impl Component for Chat {
         Ok(None)
     }
 
-    fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
-        match action {
-            Action::Chat(chat_vo) => {
-                CHAT_VO.lock().unwrap().set_chat_vo(chat_vo.clone());
+    fn update(&mut self, _action: Action) -> color_eyre::Result<Option<Action>> {
+        let mut chat_vo_guard = CHAT_VO.lock().unwrap();
+        match self.mode_holder.get_mode() {
+            Mode::RecentChat | Mode::Chat if chat_vo_guard.chat_vo.is_some() => {
+                let chat_vo = chat_vo_guard.chat_vo.take().unwrap();
                 self.fetch_history(chat_vo)
             }
             _ => Ok(None),
@@ -235,27 +237,21 @@ impl Component for Chat {
                 let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                     .begin_symbol(Some("↑"))
                     .end_symbol(Some("↓"));
-
+                let content_length = self.chat_history.len();
+                // let view_length = (chat_history_area.height as usize - 2) / 2;
+                // info!("view_length: {}", view_length);
                 self.scroll_bar.vertical_scroll_state = self
                     .scroll_bar
                     .vertical_scroll_state
-                    .content_length(items.len());
+                    .content_length(content_length);
+                    // .viewport_content_length(view_length);
                 let chat_history = Paragraph::new(items)
                     .block(block)
                     .scroll((self.scroll_bar.vertical_scroll as u16, 0));
-                frame.render_widget(
-                    chat_history,
-                    chat_history_area.inner(Margin {
-                        horizontal: 1,
-                        vertical: 0,
-                    }),
-                );
+                frame.render_widget(chat_history, chat_history_area);
                 frame.render_stateful_widget(
                     scrollbar,
-                    chat_history_area.inner(Margin {
-                        vertical: 1,
-                        horizontal: 0,
-                    }),
+                    chat_history_area,
                     &mut self.scroll_bar.vertical_scroll_state,
                 );
                 let block = Block::new()
@@ -263,10 +259,14 @@ impl Component for Chat {
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_set(symbols::border::ROUNDED);
-                let user_name =
-                    Paragraph::new(self.user_input.input.clone().unwrap_or("start to chat".to_string()))
-                        .style(self.user_input.select_style())
-                        .block(block);
+                let user_name = Paragraph::new(
+                    self.user_input
+                        .input
+                        .clone()
+                        .unwrap_or("start to chat".to_string()),
+                )
+                .style(self.user_input.select_style())
+                .block(block);
                 frame.render_widget(user_name, chat_area);
                 if self.chat_state == ChatState::Chat {
                     self.user_input.set_cursor_position(chat_area)

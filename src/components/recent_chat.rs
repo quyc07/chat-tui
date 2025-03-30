@@ -1,5 +1,6 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
+use crate::components::chat::CHAT_VO;
 use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy::HOST;
@@ -7,6 +8,7 @@ use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
+use futures::SinkExt;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::palette::tailwind::{BLUE, GREEN, SKY, SLATE};
 use ratatui::style::{Color, Modifier, Style, Stylize};
@@ -15,8 +17,15 @@ use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListSta
 use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use tokio::time::Duration;
+use tracing::info;
+
+static FIRST: LazyLock<Arc<Mutex<CheckFirst>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(CheckFirst { check: true })));
+struct CheckFirst {
+    check: bool,
+}
 
 pub(crate) struct RecentChat {
     mode_holder: ModeHolderLock,
@@ -102,21 +111,21 @@ impl From<&ChatVo> for Text<'_> {
                 let mut content = vec![
                     Line::from(Span::styled(
                         format!("好友: {}\n", user_name),
-                        Style::default().fg(Color::LightBlue),
+                        Style::default().fg(Color::White),
                     )),
                     Line::from(Span::styled(
                         format!("时间: {}\n", msg_time),
-                        Style::default().fg(Color::LightBlue),
+                        Style::default().fg(Color::White),
                     )),
                     Line::from(Span::styled(
                         format!("{}\n", msg),
-                        Style::default().fg(TEXT_FG_COLOR),
+                        Style::default().fg(Color::Green),
                     )),
                 ];
                 if let Some(unread) = unread {
                     content.push(Line::from(Span::styled(
                         format!("未读: {}\n", unread),
-                        Style::default().fg(Color::LightBlue),
+                        Style::default().fg(Color::White),
                     )))
                 }
                 Self::from(content)
@@ -133,21 +142,21 @@ impl From<&ChatVo> for Text<'_> {
                 let mut content = vec![
                     Line::from(Span::styled(
                         format!("群: {}\n", group_name),
-                        Style::default().fg(Color::LightBlue),
+                        Style::default().fg(Color::White),
                     )),
                     Line::from(Span::styled(
                         format!("时间: {}\n", msg_time),
-                        Style::default().fg(Color::LightBlue),
+                        Style::default().fg(Color::White),
                     )),
                     Line::from(Span::styled(
                         format!("{}: {}\n", user_name, msg),
-                        Style::default().fg(TEXT_FG_COLOR),
+                        Style::default().fg(Color::Green),
                     )),
                 ];
                 if let Some(unread) = unread {
                     content.push(Line::from(Span::styled(
                         format!("未读: {}\n", unread),
-                        Style::default().fg(Color::LightBlue),
+                        Style::default().fg(Color::White),
                     )))
                 }
                 Self::from(content)
@@ -158,7 +167,7 @@ impl From<&ChatVo> for Text<'_> {
 
 impl RecentChat {
     pub fn new(mode_holder: ModeHolderLock) -> Self {
-        let recent_chat = Self {
+        let mut recent_chat = Self {
             mode_holder,
             list_state: Default::default(),
             items: Arc::new(Mutex::new(Vec::new())),
@@ -197,11 +206,12 @@ impl RecentChat {
         let chat_vos = self.items.lock().unwrap();
         match self.list_state.selected() {
             Some(i) if i < chat_vos.len() => {
-                let chat_vo = chat_vos.get(i).unwrap();
-                Ok(Some(Action::Chat(chat_vo.clone())))
+                let chat_vo = chat_vos.get(i).unwrap().clone();
+                CHAT_VO.lock().unwrap().set_chat_vo(chat_vo);
             }
-            _ => Ok(None),
+            _ => {}
         }
+        Ok(None)
     }
 }
 
@@ -219,14 +229,6 @@ impl Component for RecentChat {
                 self.list_state.select_previous();
                 self.send_chat()
             }
-            KeyCode::Home => {
-                self.list_state.select_first();
-                self.send_chat()
-            }
-            KeyCode::End => {
-                self.list_state.select_last();
-                self.send_chat()
-            }
             KeyCode::Enter => {
                 self.mode_holder.set_mode(Mode::Chat);
                 Ok(None)
@@ -239,7 +241,13 @@ impl Component for RecentChat {
         if self.mode_holder.get_mode() != Mode::RecentChat {
             return Ok(None);
         }
-        Ok(None)
+        let mut first_check = FIRST.lock().unwrap();
+        // if first_check.check && self.list_state.selected().is_some() {
+        //     first_check.check = false;
+            // self.send_chat()
+        // } else {
+            Ok(None)
+        // }
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
@@ -247,7 +255,7 @@ impl Component for RecentChat {
             Mode::RecentChat | Mode::Chat => {
                 let area = area_util::recent_chat(area);
                 let block = Block::new()
-                    .title("Press Enter To Start Chat.")
+                    .title("↑↓ To Switch, Enter to Start Chat.")
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_set(symbols::border::ROUNDED);
@@ -261,9 +269,7 @@ impl Component for RecentChat {
                     .unwrap()
                     .iter()
                     .enumerate()
-                    .map(|(i, chat_vo)| {
-                        ListItem::new(Text::from(chat_vo))
-                    })
+                    .map(|(i, chat_vo)| ListItem::new(Text::from(chat_vo)))
                     .collect();
 
                 // Create a List from all list items and highlight the currently selected one
@@ -275,6 +281,13 @@ impl Component for RecentChat {
                 // We need to disambiguate this trait method as both `Widget` and `StatefulWidget` share the
                 // same method name `render`.
                 frame.render_stateful_widget(list, area, &mut self.list_state);
+                // 首次加载默认选中第一个
+                // TODO 首次加载第一个会出现双眼皮现象，暂时无法解决，后续再说吧
+                // let first_check = FIRST.lock().unwrap();
+                // if first_check.check && self.list_state.selected().is_none() {
+                //     info!("select first");
+                //     self.list_state.select_first();
+                // }
             }
             _ => {}
         }

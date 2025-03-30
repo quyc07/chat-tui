@@ -46,16 +46,14 @@ pub(crate) fn dynamic_area(rect: Rect) -> Rect {
 pub(crate) fn recent_chat(rect: Rect) -> Rect {
     let dynamic_area = dynamic_area(rect);
     let [recent_chat_area, _] =
-        Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
-            .areas(dynamic_area);
+        Layout::horizontal([Constraint::Percentage(35), Constraint::Fill(1)]).areas(dynamic_area);
     recent_chat_area
 }
 
 pub(crate) fn chat(rect: Rect) -> Rect {
     let dynamic_area = dynamic_area(rect);
-    let [_, chat_area ] =
-        Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
-            .areas(dynamic_area);
+    let [_, chat_area] =
+        Layout::horizontal([Constraint::Percentage(35), Constraint::Fill(1)]).areas(dynamic_area);
     chat_area
 }
 

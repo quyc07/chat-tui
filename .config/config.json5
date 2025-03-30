@@ -9,7 +9,8 @@
       "<Tab>": "NextTab"
     },
     "Chat": {
-      "<Ctrl-c>": "Quit"
+      "<Ctrl-c>": "Quit",
+      "<Tab>": "NextTab"
     },
     "Contact": {
       "<Ctrl-c>": "Quit",
