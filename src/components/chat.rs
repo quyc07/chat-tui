@@ -161,6 +161,7 @@ impl ChatHistory {
                 time,
                 from_uid,
             }) => {
+                // TODO 添加一个用户名字段
                 let target_name = CHAT_VO.lock().unwrap().get_target_name();
                 vec![
                     Line::from(Span::styled(

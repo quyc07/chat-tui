@@ -306,6 +306,6 @@ const fn alternate_colors(i: usize) -> Color {
 pub(crate) const TODO_HEADER_STYLE: Style = Style::new().fg(SLATE.c100).bg(BLUE.c800);
 pub(crate) const NORMAL_ROW_BG: Color = SLATE.c200;
 const ALT_ROW_BG_COLOR: Color = SLATE.c300;
-pub(crate) const SELECTED_STYLE: Style = Style::new().bg(SKY.c200).add_modifier(Modifier::BOLD);
+pub(crate) const SELECTED_STYLE: Style = Style::new().bg(SKY.c500).add_modifier(Modifier::BOLD);
 pub(crate) const TEXT_FG_COLOR: Color = SLATE.c600;
 const COMPLETED_TEXT_FG_COLOR: Color = GREEN.c500;
