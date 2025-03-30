@@ -202,7 +202,7 @@ impl UserInput {
         self.input_data.set_input(self.input.clone());
     }
 
-    fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.input.take();
         self.input_data.reset_input();
         self.reset_cursor();

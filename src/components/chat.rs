@@ -9,11 +9,9 @@ use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
-use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style};
-use ratatui::style::Stylize;
 use ratatui::widgets::{
     Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
 };
@@ -22,6 +20,7 @@ use reqwest::blocking::Client;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
+use tracing::info;
 
 pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> =
     LazyLock::new(|| Arc::new(Mutex::new(ChatVoHolder { chat_vo: None })));
@@ -52,6 +51,28 @@ pub(crate) struct Chat {
     scroll_bar: ScrollBar,
     user_input: UserInput,
     chat_state: ChatState,
+}
+
+impl Chat {
+    pub(crate) fn send_msg(&self) {
+        info!(
+            "sending message: {:?}",
+            self.user_input.data().unwrap_or_default()
+        );
+    }
+
+    fn next_state(&mut self) {
+        match self.chat_state {
+            ChatState::History => {
+                self.chat_state = ChatState::Chat;
+                self.user_input.is_editing = true;
+            }
+            ChatState::Chat => {
+                self.chat_state = ChatState::History;
+                self.user_input.is_editing = false;
+            }
+        }
+    }
 }
 
 #[derive(Eq, PartialEq, Default)]
@@ -179,29 +200,45 @@ impl Component for Chat {
         if self.mode_holder.get_mode() != Mode::Chat {
             return Ok(None);
         }
-        match key.code {
-            KeyCode::Esc => {
-                self.mode_holder.set_mode(Mode::RecentChat);
-            }
-            KeyCode::Down => {
-                self.scroll_bar.vertical_scroll = self.scroll_bar.vertical_scroll.saturating_add(1);
-                self.scroll_bar.vertical_scroll_state = self
-                    .scroll_bar
-                    .vertical_scroll_state
-                    .position(self.scroll_bar.vertical_scroll);
-            }
-            KeyCode::Up => {
-                self.scroll_bar.vertical_scroll = self.scroll_bar.vertical_scroll.saturating_sub(1);
-                self.scroll_bar.vertical_scroll_state = self
-                    .scroll_bar
-                    .vertical_scroll_state
-                    .position(self.scroll_bar.vertical_scroll);
-            }
-            KeyCode::Char('e') => {
-                // fixme
-                self.chat_state = ChatState::Chat;
-            }
-            _ => {}
+        match self.chat_state {
+            ChatState::History => match key.code {
+                KeyCode::Esc => {
+                    self.mode_holder.set_mode(Mode::RecentChat);
+                }
+                KeyCode::Down => {
+                    self.scroll_bar.vertical_scroll =
+                        self.scroll_bar.vertical_scroll.saturating_add(1);
+                    self.scroll_bar.vertical_scroll_state = self
+                        .scroll_bar
+                        .vertical_scroll_state
+                        .position(self.scroll_bar.vertical_scroll);
+                }
+                KeyCode::Up => {
+                    self.scroll_bar.vertical_scroll =
+                        self.scroll_bar.vertical_scroll.saturating_sub(1);
+                    self.scroll_bar.vertical_scroll_state = self
+                        .scroll_bar
+                        .vertical_scroll_state
+                        .position(self.scroll_bar.vertical_scroll);
+                }
+                KeyCode::Char('e') => {
+                    self.next_state();
+                }
+                _ => {}
+            },
+            ChatState::Chat => match key.code {
+                KeyCode::Enter => {
+                    self.user_input.submit_message();
+                    self.send_msg();
+                    self.user_input.reset();
+                }
+                KeyCode::Char(to_insert) => self.user_input.enter_char(to_insert),
+                KeyCode::Backspace => self.user_input.delete_char(),
+                KeyCode::Left => self.user_input.move_cursor_left(),
+                KeyCode::Right => self.user_input.move_cursor_right(),
+                KeyCode::Esc => self.next_state(),
+                _ => {}
+            },
         }
         Ok(None)
     }
@@ -244,7 +281,7 @@ impl Component for Chat {
                     .scroll_bar
                     .vertical_scroll_state
                     .content_length(content_length);
-                    // .viewport_content_length(view_length);
+                // .viewport_content_length(view_length);
                 let chat_history = Paragraph::new(items)
                     .block(block)
                     .scroll((self.scroll_bar.vertical_scroll as u16, 0));
@@ -259,15 +296,11 @@ impl Component for Chat {
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_set(symbols::border::ROUNDED);
-                let user_name = Paragraph::new(
-                    self.user_input
-                        .input
-                        .clone()
-                        .unwrap_or("start to chat".to_string()),
-                )
-                .style(self.user_input.select_style())
-                .block(block);
-                frame.render_widget(user_name, chat_area);
+                let user_input =
+                    Paragraph::new(self.user_input.input.clone().unwrap_or("".to_string()))
+                        .style(self.user_input.select_style())
+                        .block(block);
+                frame.render_widget(user_input, chat_area);
                 if self.chat_state == ChatState::Chat {
                     self.user_input.set_cursor_position(chat_area)
                 }
