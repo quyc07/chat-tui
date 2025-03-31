@@ -1,6 +1,6 @@
 use crate::action::Action;
 use crate::action::Action::Alert;
-use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
+use crate::app::{Mode, ModeHolderLock};
 use crate::components::user_input::{InputData, UserInput};
 use crate::components::{area_util, Component};
 use crate::proxy::HOST;
@@ -16,8 +16,9 @@ use ratatui::Frame;
 use reqwest::blocking::Client;
 use reqwest::StatusCode;
 use serde::Deserialize;
+use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
-use std::thread::sleep;
 use std::time::Duration;
 use tokio::task::spawn_blocking;
 use tracing::error;
@@ -27,6 +28,8 @@ pub(crate) struct Login {
     user_name_input: UserInput,
     password_input: UserInput,
     state: State,
+    // 终止程序信号
+    quit_tx: Option<Sender<()>>,
 }
 
 impl Login {
@@ -42,6 +45,7 @@ impl Login {
                 data: None,
             }),
             state: State::Normal,
+            quit_tx: None,
         }
     }
 
@@ -109,47 +113,50 @@ fn do_login(login: LoginReq) -> color_eyre::Result<String> {
     }
 }
 
-fn renew() {
+fn renew(quit_rx: Receiver<()>) {
     // 启动异步线程，定时刷新token过期时间
     thread::spawn(move || {
         loop {
-            if SHOULD_QUIT.lock().unwrap().should_quit {
-                break;
-            }
-            sleep(Duration::from_secs(60));
-            let token = match CURRENT_USER.get_user().token.clone() {
-                None => {
+            match quit_rx.recv_timeout(Duration::from_secs(60)) {
+                Ok(_) => {
                     break;
                 }
-                Some(token) => token,
-            };
-            let token = format!("Bearer {token}");
-            let renew_url = format!("{HOST}/token/renew");
-            let client = Client::new();
-            let response = client
-                .patch(renew_url)
-                .header("Authorization", token.clone())
-                .send();
-            match response {
-                Ok(res) => {
-                    if res.status().is_success() {
-                        match res.text() {
-                            Ok(t) => {
-                                let token_data = token::parse_token(t.as_str()).unwrap();
-                                CURRENT_USER.set_user(Some(token_data.claims), Some(t));
-                            }
-                            Err(e) => {
-                                error!("Failed to parse response: {}", e);
+                Err(_) => {
+                    let token = match CURRENT_USER.get_user().token.clone() {
+                        None => {
+                            break;
+                        }
+                        Some(token) => token,
+                    };
+                    let token = format!("Bearer {token}");
+                    let renew_url = format!("{HOST}/token/renew");
+                    let client = Client::new();
+                    let response = client
+                        .patch(renew_url)
+                        .header("Authorization", token.clone())
+                        .send();
+                    match response {
+                        Ok(res) => {
+                            if res.status().is_success() {
+                                match res.text() {
+                                    Ok(t) => {
+                                        let token_data = token::parse_token(t.as_str()).unwrap();
+                                        CURRENT_USER.set_user(Some(token_data.claims), Some(t));
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to parse response: {}", e);
+                                    }
+                                }
+                            } else {
+                                error!("Token refresh failed: HTTP {}", res.status());
                             }
                         }
-                    } else {
-                        error!("Token refresh failed: HTTP {}", res.status());
+                        Err(err) => {
+                            error!("Failed to send token refresh request: {}", err);
+                        }
                     }
                 }
-                Err(err) => {
-                    error!("Failed to send token refresh request: {}", err);
-                }
-            }
+            };
         }
     });
 }
@@ -191,6 +198,10 @@ impl Component for Login {
     }
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
+        if action == Action::Quit && self.quit_tx.is_some() {
+            self.quit_tx.clone().unwrap().send(())?;
+            return Ok(None);
+        }
         if self.mode_holder.get_mode() == Mode::Login && action == Action::Submit {
             let user_name = self.user_name_input.data().unwrap();
             let password = self.password_input.data().unwrap();
@@ -207,7 +218,9 @@ impl Component for Login {
                 Ok(token) => {
                     let token_data = token::parse_token(token.as_str()).unwrap();
                     CURRENT_USER.set_user(Some(token_data.claims), Some(token));
-                    renew();
+                    let (quit_tx, quit_rx) = mpsc::channel();
+                    self.quit_tx = Some(quit_tx);
+                    renew(quit_rx);
                     self.mode_holder.set_mode(Mode::RecentChat);
                     Ok(Some(Action::LoginSuccess))
                 }
