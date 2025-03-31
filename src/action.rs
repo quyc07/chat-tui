@@ -15,6 +15,7 @@ pub enum Action {
     Help,
     Alert(String, Option<ConfirmEvent>),
     Submit,
+    LoginSuccess,
     Confirm(ConfirmEvent),
     NextTab,
     Chat(ChatVo)

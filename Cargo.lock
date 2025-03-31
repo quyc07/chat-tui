@@ -313,7 +313,6 @@ dependencies = [
  "human-panic",
  "json5",
  "jsonwebtoken",
- "lazy_static",
  "libc",
  "pretty_assertions",
  "ratatui",

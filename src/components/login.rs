@@ -203,18 +203,19 @@ impl Component for Login {
                 })
             });
             let result = futures::executor::block_on(join_handle)?;
-            match result {
+            return match result {
                 Ok(token) => {
                     let token_data = token::parse_token(token.as_str()).unwrap();
                     CURRENT_USER.set_user(Some(token_data.claims), Some(token));
                     renew();
+                    self.mode_holder.set_mode(Mode::RecentChat);
+                    Ok(Some(Action::LoginSuccess))
                 }
                 Err(err) => {
                     error!("login failed, {err}");
-                    return Ok(Some(Alert(format!("{err}"), None)));
+                    Ok(Some(Alert(format!("{err}"), None)))
                 }
-            }
-            self.mode_holder.set_mode(Mode::RecentChat);
+            };
         }
         Ok(None)
     }

@@ -3,6 +3,7 @@ use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
 use crate::components::chat::CHAT_VO;
 use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
+use crate::proxy;
 use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
@@ -19,7 +20,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::time::Duration;
-use tracing::info;
+use tracing::error;
 
 static FIRST: LazyLock<Arc<Mutex<CheckFirst>>> =
     LazyLock::new(|| Arc::new(Mutex::new(CheckFirst { check: true })));
@@ -167,12 +168,12 @@ impl From<&ChatVo> for Text<'_> {
 
 impl RecentChat {
     pub fn new(mode_holder: ModeHolderLock) -> Self {
-        let mut recent_chat = Self {
+        let recent_chat = Self {
             mode_holder,
             list_state: Default::default(),
             items: Arc::new(Mutex::new(Vec::new())),
         };
-        recent_chat.start_update_thread();
+        // recent_chat.start_update_thread();
         recent_chat
     }
 
@@ -237,17 +238,25 @@ impl Component for RecentChat {
         }
     }
 
-    fn update(&mut self, _action: Action) -> color_eyre::Result<Option<Action>> {
+    fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
+        if action == Action::LoginSuccess {
+            if CURRENT_USER.get_user().user.is_some() {
+                let arc = self.items.clone();
+                proxy::send_request(move || match recent_chat() {
+                    Ok(items) => {
+                        let mut chat_vos = arc.lock().unwrap();
+                        *chat_vos = items;
+                    }
+                    Err(err) => {
+                        error!("fail to fetch recent chat: {err}");
+                    }
+                })?;
+            }
+        }
         if self.mode_holder.get_mode() != Mode::RecentChat {
             return Ok(None);
         }
-        let mut first_check = FIRST.lock().unwrap();
-        // if first_check.check && self.list_state.selected().is_some() {
-        //     first_check.check = false;
-            // self.send_chat()
-        // } else {
-            Ok(None)
-        // }
+        Ok(None)
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
