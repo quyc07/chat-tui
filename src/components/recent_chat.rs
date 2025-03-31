@@ -1,6 +1,7 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
 use crate::components::chat::CHAT_VO;
+use crate::components::event::ChatMessage;
 use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy;
@@ -9,29 +10,24 @@ use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
-use futures::SinkExt;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::palette::tailwind::{BLUE, GREEN, SKY, SLATE};
-use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState};
 use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, Mutex};
+use tokio::sync::broadcast::Receiver;
 use tokio::time::Duration;
 use tracing::error;
-
-static FIRST: LazyLock<Arc<Mutex<CheckFirst>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(CheckFirst { check: true })));
-struct CheckFirst {
-    check: bool,
-}
 
 pub(crate) struct RecentChat {
     mode_holder: ModeHolderLock,
     items: Arc<Mutex<Vec<ChatVo>>>,
     list_state: ListState,
+    chat_rx: Receiver<ChatMessage>,
 }
 
 /// 聊天记录
@@ -167,11 +163,12 @@ impl From<&ChatVo> for Text<'_> {
 }
 
 impl RecentChat {
-    pub fn new(mode_holder: ModeHolderLock) -> Self {
+    pub fn new(mode_holder: ModeHolderLock, chat_rx: Receiver<ChatMessage>) -> Self {
         let recent_chat = Self {
             mode_holder,
             list_state: Default::default(),
             items: Arc::new(Mutex::new(Vec::new())),
+            chat_rx,
         };
         // recent_chat.start_update_thread();
         recent_chat
@@ -239,19 +236,17 @@ impl Component for RecentChat {
     }
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
-        if action == Action::LoginSuccess {
-            if CURRENT_USER.get_user().user.is_some() {
-                let arc = self.items.clone();
-                proxy::send_request(move || match recent_chat() {
-                    Ok(items) => {
-                        let mut chat_vos = arc.lock().unwrap();
-                        *chat_vos = items;
-                    }
-                    Err(err) => {
-                        error!("fail to fetch recent chat: {err}");
-                    }
-                })?;
-            }
+        if action == Action::LoginSuccess && CURRENT_USER.get_user().user.is_some() {
+            let arc = self.items.clone();
+            proxy::send_request(move || match recent_chat() {
+                Ok(items) => {
+                    let mut chat_vos = arc.lock().unwrap();
+                    *chat_vos = items;
+                }
+                Err(err) => {
+                    error!("fail to fetch recent chat: {err}");
+                }
+            })?;
         }
         if self.mode_holder.get_mode() != Mode::RecentChat {
             return Ok(None);

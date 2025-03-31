@@ -22,6 +22,7 @@ use std::thread;
 use std::time::Duration;
 use tokio::task::spawn_blocking;
 use tracing::error;
+use crate::components::event::Event;
 
 pub(crate) struct Login {
     mode_holder: ModeHolderLock,

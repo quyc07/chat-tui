@@ -3,7 +3,7 @@ use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc, watch};
 use tracing::{debug, info};
 
 use crate::components::alert::Alert;
@@ -17,6 +17,7 @@ use crate::{
     config::Config,
     tui::{Event, Tui},
 };
+use crate::components::event::ChatMessage;
 
 pub(crate) static SHOULD_QUIT: LazyLock<Arc<Mutex<ShouldQuit>>> =
     LazyLock::new(|| Arc::new(Mutex::new(ShouldQuit { should_quit: false })));
@@ -79,14 +80,18 @@ impl ModeHolderLock {
 }
 
 impl App {
-    pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
+    pub async fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         let mode_holder = ModeHolderLock(Arc::new(Mutex::new(ModeHolder::default())));
         let login = Login::new(mode_holder.clone());
         let navigation = Navigation::new(mode_holder.clone());
-        let recent_chat = RecentChat::new(mode_holder.clone());
         let alert = Alert::new(mode_holder.clone());
-        let chat = Chat::new(mode_holder.clone());
+        let (chat_tx,chat_rx) = broadcast::channel(10);
+        let chat_rx1 = chat_tx.subscribe();
+        let event = crate::components::event::Event::new(chat_tx);
+        event.run().await;
+        let recent_chat = RecentChat::new(mode_holder.clone(),chat_rx);
+        let chat = Chat::new(mode_holder.clone(),chat_rx1);
         Ok(Self {
             tick_rate,
             frame_rate,
@@ -96,6 +101,7 @@ impl App {
                 Box::new(recent_chat),
                 Box::new(alert),
                 Box::new(chat),
+                Box::new(event),
             ],
             should_suspend: false,
             config: Config::new()?,

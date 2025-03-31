@@ -20,7 +20,9 @@ use reqwest::blocking::Client;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
+use tokio::sync::broadcast::Receiver;
 use tracing::info;
+use crate::components::event::ChatMessage;
 
 pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> =
     LazyLock::new(|| Arc::new(Mutex::new(ChatVoHolder { chat_vo: None })));
@@ -51,6 +53,7 @@ pub(crate) struct Chat {
     scroll_bar: ScrollBar,
     user_input: UserInput,
     chat_state: ChatState,
+    chat_rx: Receiver<ChatMessage>
 }
 
 impl Chat {
@@ -89,7 +92,7 @@ struct ScrollBar {
 }
 
 impl Chat {
-    pub(crate) fn new(mode_holder: ModeHolderLock) -> Self {
+    pub(crate) fn new(mode_holder: ModeHolderLock, chat_rx: Receiver<ChatMessage>) -> Self {
         Self {
             mode_holder,
             chat_history: Vec::new(),
@@ -99,6 +102,7 @@ impl Chat {
                 data: None,
             }),
             chat_state: Default::default(),
+            chat_rx,
         }
     }
 
