@@ -160,12 +160,11 @@ impl ChatHistory {
                 msg,
                 time,
                 from_uid,
+                from_name
             }) => {
-                // TODO 添加一个用户名字段
-                let target_name = CHAT_VO.lock().unwrap().get_target_name();
                 vec![
                     Line::from(Span::styled(
-                        format!("{target_name} {time}\n"),
+                        format!("{from_name} {time}\n"),
                         Style::default().fg(Color::White),
                     )),
                     Line::from(Span::styled(
@@ -348,6 +347,8 @@ struct UserHistoryMsg {
     time: DateTime<Local>,
     /// 消息发送者id
     from_uid: i32,
+    /// 消息发送者name
+    from_name: String,
 }
 
 #[derive(Serialize, Deserialize)]
