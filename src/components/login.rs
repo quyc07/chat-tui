@@ -2,19 +2,19 @@ use crate::action::Action;
 use crate::action::Action::Alert;
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crate::proxy::HOST;
 use crate::token;
 use crate::token::CURRENT_USER;
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
-use ratatui::Frame;
-use reqwest::blocking::Client;
 use reqwest::StatusCode;
+use reqwest::blocking::Client;
 use serde::Deserialize;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -22,7 +22,6 @@ use std::thread;
 use std::time::Duration;
 use tokio::task::spawn_blocking;
 use tracing::error;
-use crate::components::event::Event;
 
 pub(crate) struct Login {
     mode_holder: ModeHolderLock,

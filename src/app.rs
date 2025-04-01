@@ -17,7 +17,6 @@ use crate::{
     config::Config,
     tui::{Event, Tui},
 };
-use crate::components::event::ChatMessage;
 
 pub(crate) static SHOULD_QUIT: LazyLock<Arc<Mutex<ShouldQuit>>> =
     LazyLock::new(|| Arc::new(Mutex::new(ShouldQuit { should_quit: false })));
@@ -86,12 +85,12 @@ impl App {
         let login = Login::new(mode_holder.clone());
         let navigation = Navigation::new(mode_holder.clone());
         let alert = Alert::new(mode_holder.clone());
-        let (chat_tx,chat_rx) = broadcast::channel(10);
+        let (chat_tx, chat_rx) = broadcast::channel(10);
         let chat_rx1 = chat_tx.subscribe();
         let event = crate::components::event::Event::new(chat_tx);
         event.run().await;
-        let recent_chat = RecentChat::new(mode_holder.clone(),chat_rx);
-        let chat = Chat::new(mode_holder.clone(),chat_rx1);
+        let recent_chat = RecentChat::new(mode_holder.clone(), chat_rx);
+        let chat = Chat::new(mode_holder.clone(), chat_rx1);
         Ok(Self {
             tick_rate,
             frame_rate,

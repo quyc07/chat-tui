@@ -1,7 +1,8 @@
 use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Color;
@@ -13,7 +14,6 @@ use ratatui::widgets::Borders;
 use ratatui::widgets::Clear;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
-use ratatui::Frame;
 
 pub struct Alert {
     /// alert message
@@ -38,11 +38,10 @@ impl Widget for &mut Alert {
                 Constraint::Length(4),
                 Constraint::Fill(1),
             ])
-                .areas(area);
+            .areas(area);
             Clear.render(alert_area, buf);
             let [help_area, msg_area] =
-                Layout::vertical([Constraint::Length(1), Constraint::Length(3)])
-                    .areas(alert_area);
+                Layout::vertical([Constraint::Length(1), Constraint::Length(3)]).areas(alert_area);
             let msg = match self.confirm_event {
                 None => "Esc to quit.",
                 Some(_) => "Esc to quit, Enter to submit.",
@@ -58,7 +57,6 @@ impl Widget for &mut Alert {
         }
     }
 }
-
 
 impl Component for Alert {
     fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {

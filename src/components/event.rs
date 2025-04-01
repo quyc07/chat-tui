@@ -5,17 +5,15 @@ use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use futures::StreamExt;
-use ratatui::layout::Rect;
 use ratatui::Frame;
-use reqwest::header::USER_AGENT;
+use ratatui::layout::Rect;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::broadcast::Sender;
 use tokio::time::sleep;
-use tokio_util::codec::Decoder;
-use tracing::{error, info};
+use tracing::{error, warn};
 
 pub(crate) struct Event {
     chat_tx: Sender<ChatMessage>,
@@ -35,7 +33,7 @@ impl Component for Event {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
+    fn draw(&mut self, _frame: &mut Frame, _area: Rect) -> color_eyre::Result<()> {
         Ok(())
     }
 }
@@ -50,6 +48,7 @@ impl Event {
 
     pub(crate) async fn run(&self) {
         let arc = self.fetch.clone();
+        let sender = self.chat_tx.clone();
         tokio::task::spawn(async move {
             // 检查是否可以开始fetch消息
             check_need_fetch(arc).await;
@@ -63,23 +62,27 @@ impl Event {
                 .send()
                 .await;
             match res {
-                Ok(res) => {
-                    match res.status() {
-                        StatusCode::OK => {
-                            let mut stream = res.bytes_stream();
-                            while let Some(item) = stream.next().await {
-                                let bytes = item.unwrap();
-                                let cow = String::from_utf8_lossy(&bytes);
-                                info!("{}", cow);
-                                // self.chat_tx.send()
+                Ok(res) => match res.status() {
+                    StatusCode::OK => {
+                        let mut stream = res.bytes_stream();
+                        while let Some(item) = stream.next().await {
+                            let bytes = item.unwrap();
+                            let cow = String::from_utf8_lossy(&bytes);
+                            if let Some(msg) = parse(cow.to_string()) {
+                                match msg {
+                                    Message::ChatMessage(chat_msg) => {
+                                        let _ = sender.send(chat_msg);
+                                    }
+                                    Message::Heartbeat(_) => {}
+                                }
                             }
                         }
-                        _ => {
-                            let text = res.text().await.unwrap();
-                            info!("{text}");
-                        }
                     }
-                }
+                    _ => {
+                        let text = res.text().await.unwrap();
+                        warn!("fail to fetch event stream: {text}");
+                    }
+                },
                 Err(e) => {
                     error!("fail to get event stream: {}", e)
                 }
@@ -87,7 +90,20 @@ impl Event {
         });
     }
 }
+
+fn parse(sse: String) -> Option<Message> {
+    sse.lines().find_map(|line| {
+        if line.starts_with("data:") {
+            let data_json = line.trim_start_matches("data:").trim();
+            serde_json::from_str::<Message>(data_json).ok()
+        } else {
+            None
+        }
+    })
+}
+
 async fn check_need_fetch(arc: Arc<Mutex<Fetch>>) {
+    // TODO need refactor
     if !arc.lock().unwrap().need {
         loop {
             sleep(Duration::from_secs(5)).await;
@@ -104,6 +120,18 @@ pub struct ChatMessage {
     /// Message id
     pub mid: i64,
     pub payload: ChatMessagePayload,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Message {
+    ChatMessage(ChatMessage),
+    Heartbeat(HeartbeatMessage),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeartbeatMessage {
+    #[serde(with = "datetime_format")]
+    time: DateTime<Local>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

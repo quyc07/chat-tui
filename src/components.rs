@@ -10,13 +10,13 @@ use crate::{action::Action, config::Config, tui::Event};
 
 pub mod alert;
 mod area_util;
+pub mod chat;
+pub mod event;
 pub mod fps;
 pub mod login;
 pub mod navigation;
 pub mod recent_chat;
 pub mod user_input;
-pub mod chat;
-pub mod event;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 ///

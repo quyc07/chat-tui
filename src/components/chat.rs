@@ -1,8 +1,9 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
+use crate::components::event::{ChatMessage, MessageTarget};
 use crate::components::recent_chat::ChatVo;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crate::datetime::datetime_format;
 use crate::proxy;
 use crate::proxy::HOST;
@@ -15,25 +16,30 @@ use ratatui::prelude::{Color, Line, Span, Style};
 use ratatui::widgets::{
     Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
 };
-use ratatui::{symbols, Frame};
-use reqwest::blocking::Client;
+use ratatui::{Frame, symbols};
 use reqwest::StatusCode;
+use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::broadcast::Receiver;
 use tracing::info;
-use crate::components::event::ChatMessage;
 
-pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(ChatVoHolder { chat_vo: None })));
+pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> = LazyLock::new(|| {
+    Arc::new(Mutex::new(ChatVoHolder {
+        chat_vo: None,
+        need_fetch: false,
+    }))
+});
 
 pub(crate) struct ChatVoHolder {
     chat_vo: Option<ChatVo>,
+    need_fetch: bool,
 }
 
 impl ChatVoHolder {
     pub(crate) fn set_chat_vo(&mut self, chat_vo: ChatVo) {
         self.chat_vo = Some(chat_vo);
+        self.need_fetch = true;
     }
 
     fn get_target_name(&self) -> String {
@@ -49,11 +55,11 @@ impl ChatVoHolder {
 
 pub(crate) struct Chat {
     mode_holder: ModeHolderLock,
-    chat_history: Vec<ChatHistory>,
+    chat_history: Arc<Mutex<Vec<ChatHistory>>>,
     scroll_bar: ScrollBar,
     user_input: UserInput,
     chat_state: ChatState,
-    chat_rx: Receiver<ChatMessage>
+    chat_rx: Arc<tokio::sync::Mutex<Receiver<ChatMessage>>>,
 }
 
 impl Chat {
@@ -93,17 +99,56 @@ struct ScrollBar {
 
 impl Chat {
     pub(crate) fn new(mode_holder: ModeHolderLock, chat_rx: Receiver<ChatMessage>) -> Self {
-        Self {
+        let mut chat = Self {
             mode_holder,
-            chat_history: Vec::new(),
+            chat_history: Arc::new(Mutex::new(Vec::new())),
             scroll_bar: ScrollBar::default(),
             user_input: UserInput::new(InputData::ChatMsg {
                 label: Some("Press e to edit msg".to_string()),
                 data: None,
             }),
             chat_state: Default::default(),
-            chat_rx,
-        }
+            chat_rx: Arc::new(tokio::sync::Mutex::new(chat_rx)),
+        };
+        chat.refresh();
+        chat
+    }
+
+    fn refresh(&mut self) {
+        let chat_history = self.chat_history.clone();
+        let chat_rx = self.chat_rx.clone();
+        tokio::spawn(async move {
+            while let Ok(chat_message) = chat_rx.lock().await.recv().await {
+                info!("received chat_message: {:?}", chat_message);
+                match chat_message.payload.target {
+                    MessageTarget::User(message_target_user) => {
+                        let option = CHAT_VO.lock().unwrap().chat_vo.clone();
+
+                        if let Some(ChatVo::User { uid, .. }) = option {
+                            info!("uid {}, from_uid: {}", uid, chat_message.payload.from_uid);
+                            if uid == message_target_user.uid
+                                || uid == chat_message.payload.from_uid
+                            {
+                                info!("received user message");
+                                let history = UserHistoryMsg {
+                                    mid: chat_message.mid,
+                                    msg: chat_message.payload.detail.get_content(),
+                                    time: chat_message.payload.created_at,
+                                    from_uid: chat_message.payload.from_uid,
+                                    from_name: "friend".to_string(),
+                                };
+                                // fixme 消息已收到，为什么没有呈现出来
+                                chat_history
+                                    .lock()
+                                    .unwrap()
+                                    .push(ChatHistory::User(history));
+                            }
+                        }
+                    }
+                    MessageTarget::Group(messageTargetGroup) => {}
+                }
+            }
+        });
     }
 
     fn fetch_history(&mut self, chat_vo: ChatVo) -> color_eyre::Result<Option<Action>> {
@@ -112,10 +157,12 @@ impl Chat {
                 match proxy::send_request(move || fetch_user_history(uid))? {
                     Ok(chat_history) => {
                         let last_mid = chat_history.last().unwrap().mid;
-                        self.chat_history = chat_history
-                            .into_iter()
-                            .map(|m| ChatHistory::User(m))
-                            .collect();
+                        self.chat_history = Arc::new(Mutex::new(
+                            chat_history
+                                .into_iter()
+                                .map(|m| ChatHistory::User(m))
+                                .collect(),
+                        ));
                         // 更新 已读索引
                         proxy::send_request(move || {
                             set_read_index(UpdateReadIndex::User {
@@ -135,10 +182,12 @@ impl Chat {
                 match proxy::send_request(move || fetch_group_history(gid))? {
                     Ok(chat_history) => {
                         let last_mid = chat_history.last().unwrap().mid;
-                        self.chat_history = chat_history
-                            .into_iter()
-                            .map(|m| ChatHistory::Group(m))
-                            .collect();
+                        self.chat_history = Arc::new(Mutex::new(
+                            chat_history
+                                .into_iter()
+                                .map(|m| ChatHistory::Group(m))
+                                .collect(),
+                        ));
                         // 更新 已读索引
                         proxy::send_request(move || {
                             set_read_index(UpdateReadIndex::Group {
@@ -164,7 +213,7 @@ impl ChatHistory {
                 msg,
                 time,
                 from_uid,
-                from_name
+                from_name,
             }) => {
                 vec![
                     Line::from(Span::styled(
@@ -250,8 +299,13 @@ impl Component for Chat {
     fn update(&mut self, _action: Action) -> color_eyre::Result<Option<Action>> {
         let mut chat_vo_guard = CHAT_VO.lock().unwrap();
         match self.mode_holder.get_mode() {
-            Mode::RecentChat | Mode::Chat if chat_vo_guard.chat_vo.is_some() => {
-                let chat_vo = chat_vo_guard.chat_vo.take().unwrap();
+            Mode::RecentChat | Mode::Chat
+                if chat_vo_guard.chat_vo.is_some()
+                    && chat_vo_guard.need_fetch
+                    && self.chat_state == ChatState::History =>
+            {
+                chat_vo_guard.need_fetch = false;
+                let chat_vo = chat_vo_guard.chat_vo.clone().unwrap();
                 self.fetch_history(chat_vo)
             }
             _ => Ok(None),
@@ -269,8 +323,8 @@ impl Component for Chat {
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_set(symbols::border::ROUNDED);
-                let items = self
-                    .chat_history
+                let chat_history = self.chat_history.lock().unwrap();
+                let items = chat_history
                     .iter()
                     .map(|chat_history| chat_history.convert_lines())
                     .flatten()
@@ -278,7 +332,7 @@ impl Component for Chat {
                 let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                     .begin_symbol(Some("↑"))
                     .end_symbol(Some("↓"));
-                let content_length = self.chat_history.len();
+                let content_length = chat_history.len();
                 // let view_length = (chat_history_area.height as usize - 2) / 2;
                 // info!("view_length: {}", view_length);
                 self.scroll_bar.vertical_scroll_state = self

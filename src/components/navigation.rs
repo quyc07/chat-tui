@@ -1,12 +1,12 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
+use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Tabs};
-use ratatui::Frame;
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use unicode_width::UnicodeWidthStr;
 
