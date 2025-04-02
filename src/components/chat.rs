@@ -3,7 +3,7 @@ use crate::app::{Mode, ModeHolderLock};
 use crate::components::event::{ChatMessage, MessageTarget};
 use crate::components::recent_chat::ChatVo;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy;
 use crate::proxy::HOST;
@@ -16,9 +16,9 @@ use ratatui::prelude::{Color, Line, Span, Style};
 use ratatui::widgets::{
     Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
 };
-use ratatui::{Frame, symbols};
-use reqwest::StatusCode;
+use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::broadcast::Receiver;
@@ -97,6 +97,13 @@ struct ScrollBar {
     vertical_scroll: usize,
 }
 
+impl ScrollBar {
+    fn reset(&mut self) {
+        self.vertical_scroll_state = Default::default();
+        self.vertical_scroll = 0;
+    }
+}
+
 impl Chat {
     pub(crate) fn new(mode_holder: ModeHolderLock, chat_rx: Receiver<ChatMessage>) -> Self {
         let mut chat = Self {
@@ -129,7 +136,6 @@ impl Chat {
                             if uid == message_target_user.uid
                                 || uid == chat_message.payload.from_uid
                             {
-                                info!("received user message");
                                 let history = UserHistoryMsg {
                                     mid: chat_message.mid,
                                     msg: chat_message.payload.detail.get_content(),
@@ -137,6 +143,7 @@ impl Chat {
                                     from_uid: chat_message.payload.from_uid,
                                     from_name: "friend".to_string(),
                                 };
+                                info!("received user message，: {:?}", history);
                                 // fixme 消息已收到，为什么没有呈现出来
                                 chat_history
                                     .lock()
@@ -305,6 +312,7 @@ impl Component for Chat {
                     && self.chat_state == ChatState::History =>
             {
                 chat_vo_guard.need_fetch = false;
+                self.scroll_bar.reset();
                 let chat_vo = chat_vo_guard.chat_vo.clone().unwrap();
                 self.fetch_history(chat_vo)
             }
@@ -394,7 +402,7 @@ fn fetch_user_history(target_uid: i32) -> color_eyre::Result<Vec<UserHistoryMsg>
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct UserHistoryMsg {
     /// 消息id
     mid: i64,
