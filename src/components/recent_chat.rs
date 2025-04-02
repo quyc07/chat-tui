@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::Receiver;
 use tokio::time::Duration;
-use tracing::error;
+use tracing::{debug, error};
 
 pub(crate) struct RecentChat {
     mode_holder: ModeHolderLock,
@@ -205,6 +205,7 @@ impl RecentChat {
         match self.list_state.selected() {
             Some(i) if i < chat_vos.len() => {
                 let chat_vo = chat_vos.get(i).unwrap().clone();
+                debug!("Sending Chat message, chat_vo={:?}", chat_vo);
                 CHAT_VO.lock().unwrap().set_chat_vo(chat_vo);
             }
             _ => {}

@@ -22,7 +22,7 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::broadcast::Receiver;
-use tracing::info;
+use tracing::{debug, info};
 
 pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> = LazyLock::new(|| {
     Arc::new(Mutex::new(ChatVoHolder {
@@ -33,6 +33,7 @@ pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> = LazyLock::new(||
 
 pub(crate) struct ChatVoHolder {
     chat_vo: Option<ChatVo>,
+    // 是否需要重新获取历史消息
     need_fetch: bool,
 }
 
@@ -122,20 +123,19 @@ impl Chat {
     }
 
     fn refresh(&mut self) {
-        let chat_history = self.chat_history.clone();
+        let chat_history = Arc::clone(&self.chat_history);
+        let chat_vo_current = Arc::clone(&CHAT_VO);
+        // let chat_history = self.chat_history.clone();
         let chat_rx = self.chat_rx.clone();
         tokio::spawn(async move {
             while let Ok(chat_message) = chat_rx.lock().await.recv().await {
                 info!("received chat_message: {:?}", chat_message);
                 match chat_message.payload.target {
-                    MessageTarget::User(message_target_user) => {
-                        let option = CHAT_VO.lock().unwrap().chat_vo.clone();
-
-                        if let Some(ChatVo::User { uid, .. }) = option {
-                            info!("uid {}, from_uid: {}", uid, chat_message.payload.from_uid);
-                            if uid == message_target_user.uid
-                                || uid == chat_message.payload.from_uid
-                            {
+                    MessageTarget::User(target_user) => {
+                        if let Some(ChatVo::User { uid, .. }) =
+                            chat_vo_current.lock().unwrap().chat_vo
+                        {
+                            if uid == target_user.uid || uid == chat_message.payload.from_uid {
                                 let history = UserHistoryMsg {
                                     mid: chat_message.mid,
                                     msg: chat_message.payload.detail.get_content(),
@@ -143,33 +143,51 @@ impl Chat {
                                     from_uid: chat_message.payload.from_uid,
                                     from_name: "friend".to_string(),
                                 };
-                                info!("received user message，: {:?}", history);
-                                // fixme 消息已收到，为什么没有呈现出来
-                                chat_history
-                                    .lock()
-                                    .unwrap()
-                                    .push(ChatHistory::User(history));
+                                let mut guard = chat_history.lock().unwrap();
+                                guard.push(ChatHistory::User(history));
+                            } else {
+                                // TODO 另一个好友发送的消息
                             }
                         }
                     }
-                    MessageTarget::Group(messageTargetGroup) => {}
+                    MessageTarget::Group(target_group) => {
+                        let option = chat_vo_current.lock().unwrap().chat_vo.clone();
+                        if let Some(ChatVo::Group { gid, .. }) = option {
+                            if gid == target_group.gid
+                                || CURRENT_USER.get_user().user.unwrap().id
+                                    == chat_message.payload.from_uid
+                            {
+                                let history = GroupHistoryMsg {
+                                    mid: chat_message.mid,
+                                    msg: chat_message.payload.detail.get_content(),
+                                    time: chat_message.payload.created_at,
+                                    from_uid: chat_message.payload.from_uid,
+                                    name_of_from_uid: "friend_in_group".to_string(),
+                                };
+                                let mut guard = chat_history.lock().unwrap();
+                                guard.push(ChatHistory::Group(history));
+                            } else {
+                                // TODO 另一个群的消息
+                            }
+                        }
+                    }
                 }
             }
         });
     }
 
     fn fetch_history(&mut self, chat_vo: ChatVo) -> color_eyre::Result<Option<Action>> {
+        self.chat_history.lock().unwrap().clear();
         match chat_vo {
             ChatVo::User { uid, user_name, .. } => {
                 match proxy::send_request(move || fetch_user_history(uid))? {
                     Ok(chat_history) => {
                         let last_mid = chat_history.last().unwrap().mid;
-                        self.chat_history = Arc::new(Mutex::new(
-                            chat_history
-                                .into_iter()
-                                .map(|m| ChatHistory::User(m))
-                                .collect(),
-                        ));
+                        let mut guard = self.chat_history.lock().unwrap();
+                        chat_history
+                            .into_iter()
+                            .map(|m| ChatHistory::User(m))
+                            .for_each(|c| guard.push(c));
                         // 更新 已读索引
                         proxy::send_request(move || {
                             set_read_index(UpdateReadIndex::User {
@@ -189,12 +207,11 @@ impl Chat {
                 match proxy::send_request(move || fetch_group_history(gid))? {
                     Ok(chat_history) => {
                         let last_mid = chat_history.last().unwrap().mid;
-                        self.chat_history = Arc::new(Mutex::new(
-                            chat_history
-                                .into_iter()
-                                .map(|m| ChatHistory::Group(m))
-                                .collect(),
-                        ));
+                        let mut guard = self.chat_history.lock().unwrap();
+                        chat_history
+                            .into_iter()
+                            .map(|m| ChatHistory::Group(m))
+                            .for_each(|c| guard.push(c));
                         // 更新 已读索引
                         proxy::send_request(move || {
                             set_read_index(UpdateReadIndex::Group {
@@ -311,6 +328,7 @@ impl Component for Chat {
                     && chat_vo_guard.need_fetch
                     && self.chat_state == ChatState::History =>
             {
+                debug!("Chat need fetch, chat_vo={:?}", chat_vo_guard.chat_vo);
                 chat_vo_guard.need_fetch = false;
                 self.scroll_bar.reset();
                 let chat_vo = chat_vo_guard.chat_vo.clone().unwrap();
