@@ -125,11 +125,10 @@ impl Chat {
     fn refresh(&mut self) {
         let chat_history = Arc::clone(&self.chat_history);
         let chat_vo_current = Arc::clone(&CHAT_VO);
-        // let chat_history = self.chat_history.clone();
         let chat_rx = self.chat_rx.clone();
         tokio::spawn(async move {
             while let Ok(chat_message) = chat_rx.lock().await.recv().await {
-                info!("received chat_message: {:?}", chat_message);
+                debug!("received chat_message: {:?}", chat_message);
                 match chat_message.payload.target {
                     MessageTarget::User(target_user) => {
                         if let Some(ChatVo::User { uid, .. }) =
@@ -145,8 +144,6 @@ impl Chat {
                                 };
                                 let mut guard = chat_history.lock().unwrap();
                                 guard.push(ChatHistory::User(history));
-                            } else {
-                                // TODO 另一个好友发送的消息
                             }
                         }
                     }
@@ -162,12 +159,10 @@ impl Chat {
                                     msg: chat_message.payload.detail.get_content(),
                                     time: chat_message.payload.created_at,
                                     from_uid: chat_message.payload.from_uid,
-                                    name_of_from_uid: "friend_in_group".to_string(),
+                                    name_of_from_uid: "friend_in_group".to_string(),// TODO 获取用户名
                                 };
                                 let mut guard = chat_history.lock().unwrap();
                                 guard.push(ChatHistory::Group(history));
-                            } else {
-                                // TODO 另一个群的消息
                             }
                         }
                     }

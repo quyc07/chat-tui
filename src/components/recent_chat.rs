@@ -1,8 +1,8 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
 use crate::components::chat::CHAT_VO;
-use crate::components::event::ChatMessage;
-use crate::components::{Component, area_util};
+use crate::components::event::{ChatMessage, MessageTarget};
+use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy;
 use crate::proxy::HOST;
@@ -15,19 +15,18 @@ use ratatui::style::palette::tailwind::{BLUE, GREEN, SKY, SLATE};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::Receiver;
-use tokio::time::Duration;
 use tracing::{debug, error};
 
 pub(crate) struct RecentChat {
     mode_holder: ModeHolderLock,
-    items: Arc<Mutex<Vec<ChatVo>>>,
+    chat_vos: Arc<Mutex<Vec<ChatVo>>>,
     list_state: ListState,
-    chat_rx: Receiver<ChatMessage>,
+    chat_rx: Arc<tokio::sync::Mutex<Receiver<ChatMessage>>>,
 }
 
 /// 聊天记录
@@ -69,6 +68,39 @@ pub(crate) enum ChatVo {
         /// unread message count
         unread: Option<String>,
     },
+}
+
+impl ChatVo {
+    fn update(&mut self, chat_message: &ChatMessage) {
+        match self {
+            ChatVo::User {
+                mid,
+                msg,
+                msg_time,
+                unread,
+                ..
+            } => {
+                *mid = chat_message.mid;
+                *msg = chat_message.payload.detail.get_content();
+                *msg_time = chat_message.payload.created_at;
+            }
+            ChatVo::Group {
+                uid,
+                user_name,
+                mid,
+                msg,
+                msg_time,
+                unread,
+                ..
+            } => {
+                *uid = *uid;
+                *user_name = "friend_in_group".to_string();// TODO 获取用户名
+                *mid = chat_message.mid;
+                *msg = chat_message.payload.detail.get_content();
+                *msg_time = chat_message.payload.created_at;
+            }
+        }
+    }
 }
 
 fn recent_chat() -> color_eyre::Result<Vec<ChatVo>> {
@@ -164,44 +196,54 @@ impl From<&ChatVo> for Text<'_> {
 
 impl RecentChat {
     pub fn new(mode_holder: ModeHolderLock, chat_rx: Receiver<ChatMessage>) -> Self {
-        let recent_chat = Self {
+        let mut recent_chat = Self {
             mode_holder,
             list_state: Default::default(),
-            items: Arc::new(Mutex::new(Vec::new())),
-            chat_rx,
+            chat_vos: Arc::new(Mutex::new(Vec::new())),
+            chat_rx: Arc::new(tokio::sync::Mutex::new(chat_rx)),
         };
-        // recent_chat.start_update_thread();
+        recent_chat.refresh();
         recent_chat
     }
 
-    fn start_update_thread(&self) {
-        let value_clone = self.items.clone();
-        tokio::task::spawn_blocking(move || {
-            loop {
-                if SHOULD_QUIT.lock().unwrap().should_quit {
-                    break;
-                }
-                if CURRENT_USER.get_user().user.is_some() {
-                    // 尽快释放锁，方便数据呈现
-                    {
-                        let mut value = value_clone.lock().unwrap();
-                        match recent_chat() {
-                            Ok(items) => {
-                                *value = items;
+    fn refresh(&mut self) {
+        let chat_vos = Arc::clone(&self.chat_vos);
+        let chat_rx = self.chat_rx.clone();
+        tokio::spawn(async move {
+            while let Ok(chat_message) = chat_rx.lock().await.recv().await {
+                debug!("received chat_message: {:?}", chat_message);
+                match chat_message.payload.target {
+                    MessageTarget::User(target_user) => {
+                        let mut guard = chat_vos.lock().unwrap();
+                        guard.iter_mut().for_each(|c| {
+                            if let ChatVo::User { uid, .. } = c {
+                                if *uid == target_user.uid || *uid == chat_message.payload.from_uid
+                                {
+                                    c.update(&chat_message);
+                                }
                             }
-                            Err(err) => {
-                                eprintln!("Error: {}", err);
-                            }
-                        }
+                        });
                     }
-                    std::thread::sleep(Duration::from_secs(5));
-                }
+                    MessageTarget::Group(target_group) => {
+                        let mut guard = chat_vos.lock().unwrap();
+                        guard.iter_mut().for_each(|c| {
+                            if let ChatVo::Group { gid, .. } = c {
+                                if *gid == target_group.gid
+                                    || CURRENT_USER.get_user().user.unwrap().id
+                                        == chat_message.payload.from_uid
+                                {
+                                    c.update(&chat_message);
+                                }
+                            }
+                        });
+                    }
+                };
             }
         });
     }
 
     fn send_chat(&mut self) -> color_eyre::Result<Option<Action>> {
-        let chat_vos = self.items.lock().unwrap();
+        let chat_vos = self.chat_vos.lock().unwrap();
         match self.list_state.selected() {
             Some(i) if i < chat_vos.len() => {
                 let chat_vo = chat_vos.get(i).unwrap().clone();
@@ -238,7 +280,7 @@ impl Component for RecentChat {
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if action == Action::LoginSuccess && CURRENT_USER.get_user().user.is_some() {
-            let arc = self.items.clone();
+            let arc = self.chat_vos.clone();
             proxy::send_request(move || match recent_chat() {
                 Ok(items) => {
                     let mut chat_vos = arc.lock().unwrap();
@@ -269,7 +311,7 @@ impl Component for RecentChat {
 
                 // Iterate through all elements in the `items` and stylize them.
                 let items: Vec<ListItem> = self
-                    .items
+                    .chat_vos
                     .lock()
                     .unwrap()
                     .iter()
