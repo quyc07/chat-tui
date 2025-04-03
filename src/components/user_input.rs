@@ -1,11 +1,11 @@
 use crate::action::Action;
 use crate::components::Component;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::prelude::{Color, Style};
 use ratatui::widgets::Widget;
+use ratatui::Frame;
 
 pub(crate) struct UserInput {
     /// 当前文本框内容
@@ -33,6 +33,10 @@ pub(crate) enum InputData {
         label: Option<String>,
         data: Option<String>,
     },
+    Search {
+        label: Option<String>,
+        data: Option<String>,
+    },
 }
 
 impl InputData {
@@ -45,6 +49,9 @@ impl InputData {
                 *data = input_data;
             }
             InputData::ChatMsg { label: _, data } => {
+                *data = input_data;
+            }
+            InputData::Search { label: _, data } => {
                 *data = input_data;
             }
         }
@@ -61,6 +68,9 @@ impl InputData {
             InputData::ChatMsg { label: _, data } => {
                 *data = None;
             }
+            InputData::Search { label: _, data } => {
+                *data = None;
+            }
         }
     }
 
@@ -69,6 +79,7 @@ impl InputData {
             InputData::UserName { label: _, data } => data.clone(),
             InputData::Password { label: _, data } => data.clone(),
             InputData::ChatMsg { label: _, data } => data.clone(),
+            InputData::Search { label: _, data } => data.clone(),
         }
     }
 
@@ -77,6 +88,7 @@ impl InputData {
             InputData::UserName { label, data: _ } => label.clone().unwrap_or_default(),
             InputData::Password { label, data: _ } => label.clone().unwrap_or_default(),
             InputData::ChatMsg { label, data: _ } => label.clone().unwrap_or_default(),
+            InputData::Search { label, data: _ } => label.clone().unwrap_or_default(),
         }
     }
 }

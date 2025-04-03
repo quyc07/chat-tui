@@ -1,12 +1,12 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
-use crate::components::{Component, area_util};
-use ratatui::Frame;
+use crate::components::{area_util, Component};
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Tabs};
+use ratatui::Frame;
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use unicode_width::UnicodeWidthStr;
 
@@ -21,6 +21,17 @@ impl Navigation {
             mode_holder,
             item: NavigationItem::RecentChat,
         }
+    }
+
+    fn next(&mut self) {
+        self.item.circle();
+        let next_mode = match self.mode_holder.get_mode() {
+            Mode::RecentChat => Mode::Contact,
+            Mode::Contact => Mode::Setting,
+            Mode::Setting => Mode::RecentChat,
+            _ => self.mode_holder.get_mode(),
+        };
+        self.mode_holder.set_mode(next_mode);
     }
 }
 
@@ -79,7 +90,7 @@ impl Component for Navigation {
         match self.mode_holder.get_mode() {
             Mode::RecentChat | Mode::Contact | Mode::Setting => {
                 if let Action::NextTab = action {
-                    self.item = self.item.circle()
+                    self.next();
                 }
             }
             _ => {}

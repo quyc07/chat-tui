@@ -347,7 +347,7 @@ impl Component for RecentChat {
                     .unwrap()
                     .iter()
                     .enumerate()
-                    .map(|(i, chat_vo)| ListItem::new(Text::from(chat_vo)))
+                    .map(|(_, chat_vo)| ListItem::new(Text::from(chat_vo)))
                     .collect();
 
                 // Create a List from all list items and highlight the currently selected one

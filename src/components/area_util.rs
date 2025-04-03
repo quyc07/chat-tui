@@ -61,3 +61,7 @@ pub(crate) fn alert_area(rect: Rect) -> Rect {
     let area = total_area(rect);
     centered_rect(80, 50, area)
 }
+
+pub(crate) fn contact_area(rect: Rect) -> Rect {
+    dynamic_area(rect)
+}
