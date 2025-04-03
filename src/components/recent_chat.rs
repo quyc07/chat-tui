@@ -71,6 +71,18 @@ pub(crate) enum ChatVo {
 }
 
 impl ChatVo {
+    pub(crate) fn reset_unread(&mut self) -> Option<()> {
+        match self {
+            ChatVo::User { unread, .. } => {
+                *unread = None;
+            }
+            ChatVo::Group { unread, .. } => {
+                *unread = None;
+            }
+        }
+        None
+    }
+
     fn update(&mut self, chat_message: &ChatMessage) {
         match self {
             ChatVo::User {
@@ -83,6 +95,7 @@ impl ChatVo {
                 *mid = chat_message.mid;
                 *msg = chat_message.payload.detail.get_content();
                 *msg_time = chat_message.payload.created_at;
+                *unread = update_unread(unread)
             }
             ChatVo::Group {
                 uid,
@@ -94,11 +107,22 @@ impl ChatVo {
                 ..
             } => {
                 *uid = *uid;
-                *user_name = "friend_in_group".to_string();// TODO 获取用户名
+                *user_name = "friend_in_group".to_string(); // TODO 获取用户名
                 *mid = chat_message.mid;
                 *msg = chat_message.payload.detail.get_content();
                 *msg_time = chat_message.payload.created_at;
+                *unread = update_unread(unread)
             }
+        }
+    }
+}
+fn update_unread(unread: &mut Option<String>) -> Option<String> {
+    match unread {
+        None => Some("1".to_string()),
+        Some(count) if count == "all" => Some(count.to_owned()),
+        Some(count) => {
+            let count = count.parse::<i32>().unwrap();
+            Some((count + 1).to_string())
         }
     }
 }
@@ -243,9 +267,10 @@ impl RecentChat {
     }
 
     fn send_chat(&mut self) -> color_eyre::Result<Option<Action>> {
-        let chat_vos = self.chat_vos.lock().unwrap();
+        let mut chat_vos = self.chat_vos.lock().unwrap();
         match self.list_state.selected() {
             Some(i) if i < chat_vos.len() => {
+                chat_vos.get_mut(i).and_then(|c| c.reset_unread());
                 let chat_vo = chat_vos.get(i).unwrap().clone();
                 debug!("Sending Chat message, chat_vo={:?}", chat_vo);
                 CHAT_VO.lock().unwrap().set_chat_vo(chat_vo);
