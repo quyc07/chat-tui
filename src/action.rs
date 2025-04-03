@@ -17,6 +17,7 @@ pub enum Action {
     LoginSuccess,
     Confirm(ConfirmEvent),
     NextTab,
+    Register,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Display, Serialize, Deserialize)]

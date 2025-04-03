@@ -2,20 +2,20 @@ use crate::action::Action;
 use crate::action::Action::Alert;
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::proxy::HOST;
-use crate::token;
 use crate::token::CURRENT_USER;
+use crate::{proxy, token};
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
-use reqwest::StatusCode;
+use ratatui::Frame;
 use reqwest::blocking::Client;
-use serde::Deserialize;
+use reqwest::StatusCode;
+use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
@@ -75,6 +75,39 @@ enum State {
     PasswordEditing,
 }
 
+/// Register New User
+#[derive(Debug, Serialize, Deserialize)]
+struct UserRegisterReq {
+    /// name
+    name: String,
+    /// email
+    email: Option<String>,
+    /// password
+    password: String,
+    /// phone
+    phone: Option<String>,
+}
+
+fn register(req: UserRegisterReq) -> color_eyre::Result<i32> {
+    let register_url = format!("{HOST}/user/register");
+    let client = Client::new();
+    let response = client.post(register_url).json(&req).send();
+
+    match response {
+        Ok(res) => {
+            if res.status().is_success() {
+                match res.text() {
+                    Ok(uid) => Ok(uid.parse::<i32>()?),
+                    Err(e) => Err(format_err!("Failed to parse response: {}", e)),
+                }
+            } else {
+                Err(format_err!("Register failed: HTTP {}", res.status()))
+            }
+        }
+        Err(e) => Err(format_err!("Failed to send register request: {}", e)),
+    }
+}
+
 struct LoginReq {
     user_name: String,
     password: String,
@@ -85,7 +118,7 @@ struct LoginRes {
     pub access_token: String,
 }
 
-fn do_login(login: LoginReq) -> color_eyre::Result<String> {
+fn login(login: LoginReq) -> color_eyre::Result<String> {
     let login_url = format!("{HOST}/token/login");
     let client = Client::new();
     let response = client
@@ -202,32 +235,55 @@ impl Component for Login {
             self.quit_tx.clone().unwrap().send(())?;
             return Ok(None);
         }
-        if self.mode_holder.get_mode() == Mode::Login && action == Action::Submit {
-            let user_name = self.user_name_input.data().unwrap();
-            let password = self.password_input.data().unwrap();
-            // 当前环境为异步环境，但是本方法为同步方法，不能在同步方法中直接调用异步方法，但是reqwest的同步客户端无法在异步环境中使用
-            // 因此此处使用tokio的同步方法结合futures的同步执行器获取结果
-            let join_handle = spawn_blocking(|| {
-                do_login(LoginReq {
-                    user_name,
-                    password,
-                })
-            });
-            let result = futures::executor::block_on(join_handle)?;
-            return match result {
-                Ok(token) => {
-                    let token_data = token::parse_token(token.as_str()).unwrap();
-                    CURRENT_USER.set_user(Some(token_data.claims), Some(token));
-                    let (quit_tx, quit_rx) = mpsc::channel();
-                    self.quit_tx = Some(quit_tx);
-                    renew(quit_rx);
-                    self.mode_holder.set_mode(Mode::RecentChat);
-                    Ok(Some(Action::LoginSuccess))
+        if self.mode_holder.get_mode() == Mode::Login {
+            return match action {
+                Action::Submit => {
+                    let user_name = self.user_name_input.data().unwrap();
+                    let password = self.password_input.data().unwrap();
+                    // 当前环境为异步环境，但是本方法为同步方法，不能在同步方法中直接调用异步方法，但是reqwest的同步客户端无法在异步环境中使用
+                    // 因此此处使用tokio的同步方法结合futures的同步执行器获取结果
+                    let result = proxy::send_request(|| {
+                        login(LoginReq {
+                            user_name,
+                            password,
+                        })
+                    })?;
+                    match result {
+                        Ok(token) => {
+                            let token_data = token::parse_token(token.as_str()).unwrap();
+                            CURRENT_USER.set_user(Some(token_data.claims), Some(token));
+                            let (quit_tx, quit_rx) = mpsc::channel();
+                            self.quit_tx = Some(quit_tx);
+                            renew(quit_rx);
+                            self.mode_holder.set_mode(Mode::RecentChat);
+                            Ok(Some(Action::LoginSuccess))
+                        }
+                        Err(err) => {
+                            error!("login failed, {err}");
+                            Ok(Some(Alert(format!("{err}"), None)))
+                        }
+                    }
                 }
-                Err(err) => {
-                    error!("login failed, {err}");
-                    Ok(Some(Alert(format!("{err}"), None)))
+                Action::Register => {
+                    let user_name = self.user_name_input.data().unwrap();
+                    let password = self.password_input.data().unwrap();
+                    let result = proxy::send_request(|| {
+                        register(UserRegisterReq {
+                            name: user_name,
+                            email: None,
+                            password,
+                            phone: None,
+                        })
+                    })?;
+                    match result {
+                        Ok(_) => Ok(Some(Action::Submit)),
+                        Err(e) => {
+                            error!("register failed, {e}");
+                            Ok(Some(Alert(format!("{e}"), None)))
+                        }
+                    }
                 }
+                _ => Ok(None),
             };
         }
         Ok(None)
@@ -270,7 +326,8 @@ impl Component for Login {
             State::Normal => (
                 vec![
                     "Press e to start editing, ".bold(),
-                    "Ctrl+S to login.".bold(),
+                    "Ctrl+S to login, ".bold(),
+                    "Ctrl+R to register.".bold(),
                 ],
                 Style::default().add_modifier(Modifier::RAPID_BLINK),
             ),
