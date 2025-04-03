@@ -11,6 +11,7 @@ use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
+use futures::future::err;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style};
 use ratatui::widgets::{
@@ -22,7 +23,7 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::broadcast::Receiver;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> = LazyLock::new(|| {
     Arc::new(Mutex::new(ChatVoHolder {
@@ -64,11 +65,20 @@ pub(crate) struct Chat {
 }
 
 impl Chat {
-    pub(crate) fn send_msg(&self) {
-        info!(
-            "sending message: {:?}",
-            self.user_input.data().unwrap_or_default()
-        );
+    pub(crate) fn new(mode_holder: ModeHolderLock, chat_rx: Receiver<ChatMessage>) -> Self {
+        let mut chat = Self {
+            mode_holder,
+            chat_history: Arc::new(Mutex::new(Vec::new())),
+            scroll_bar: ScrollBar::default(),
+            user_input: UserInput::new(InputData::ChatMsg {
+                label: Some("Press e to edit msg".to_string()),
+                data: None,
+            }),
+            chat_state: Default::default(),
+            chat_rx: Arc::new(tokio::sync::Mutex::new(chat_rx)),
+        };
+        chat.refresh();
+        chat
     }
 
     fn next_state(&mut self) {
@@ -106,20 +116,22 @@ impl ScrollBar {
 }
 
 impl Chat {
-    pub(crate) fn new(mode_holder: ModeHolderLock, chat_rx: Receiver<ChatMessage>) -> Self {
-        let mut chat = Self {
-            mode_holder,
-            chat_history: Arc::new(Mutex::new(Vec::new())),
-            scroll_bar: ScrollBar::default(),
-            user_input: UserInput::new(InputData::ChatMsg {
-                label: Some("Press e to edit msg".to_string()),
-                data: None,
-            }),
-            chat_state: Default::default(),
-            chat_rx: Arc::new(tokio::sync::Mutex::new(chat_rx)),
-        };
-        chat.refresh();
-        chat
+    pub(crate) fn send_msg(&self) {
+        let guard = CHAT_VO.lock().unwrap();
+        if let Some(msg) = self.user_input.data() {
+            match guard.chat_vo.clone().unwrap() {
+                ChatVo::User { uid, .. } => {
+                    if let Err(err) = send_user_msg(uid, msg) {
+                        error!("error sending user msg: {}", err);
+                    }
+                }
+                ChatVo::Group { gid, .. } => {
+                    if let Err(err) = send_group_msg(gid, msg) {
+                        error!("error sending user msg: {}", err);
+                    }
+                }
+            }
+        }
     }
 
     fn refresh(&mut self) {
@@ -408,6 +420,43 @@ impl Component for Chat {
             _ => {}
         }
         Ok(())
+    }
+}
+
+/// Send message request
+#[derive(Serialize)]
+pub struct SendMsgReq {
+    /// Message content
+    pub msg: String,
+}
+
+fn send_user_msg(uid: i32, msg: String) -> color_eyre::Result<()> {
+    let url = format!("{HOST}/user/{uid}/send");
+    proxy::send_request(|| send_msg(msg, url))?
+}
+
+fn send_group_msg(gid: i32, msg: String) -> color_eyre::Result<()> {
+    let url = format!("{HOST}/group/{gid}/send");
+    proxy::send_request(|| send_msg(msg, url))?
+}
+
+fn send_msg(msg: String, url: String) -> color_eyre::Result<()> {
+    let token = CURRENT_USER.get_user().token.clone().unwrap();
+    debug!("sending msg to {url}, msg: {msg}");
+    let res = Client::new()
+        .put(url)
+        .json(&SendMsgReq { msg })
+        .header("Authorization", format!("Bearer {token}"))
+        .send();
+    match res {
+        Ok(res) => match res.status() {
+            StatusCode::OK => {
+                debug!("sent msg: {res:?}");
+                Ok(())
+            }
+            _ => Err(format_err!("Failed to send message: {res:?}")),
+        },
+        Err(err) => Err(format_err!("Failed to send message:{err}")),
     }
 }
 
