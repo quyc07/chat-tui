@@ -25,7 +25,7 @@ use tracing::{debug, error};
 pub(crate) struct RecentChat {
     mode_holder: ModeHolderLock,
     chat_vos: Arc<Mutex<Vec<ChatVo>>>,
-    list_state: ListState,
+    list_state: Arc<Mutex<ListState>>,
     chat_rx: Arc<tokio::sync::Mutex<Receiver<ChatMessage>>>,
 }
 
@@ -237,10 +237,11 @@ impl RecentChat {
     fn refresh(&mut self) {
         let chat_vos = Arc::clone(&self.chat_vos);
         let chat_rx = self.chat_rx.clone();
-        let selected_idx = self.list_state.selected().unwrap_or_default();
+        let list_state = Arc::clone(&self.list_state);
         tokio::spawn(async move {
             while let Ok(chat_message) = chat_rx.lock().await.recv().await {
                 debug!("received chat_message: {:?}", chat_message);
+                let selected_idx = list_state.lock().unwrap().selected().unwrap();
                 match chat_message.payload.target {
                     MessageTarget::User(target_user) => {
                         let mut guard = chat_vos.lock().unwrap();
@@ -273,7 +274,7 @@ impl RecentChat {
 
     fn send_chat(&mut self) -> color_eyre::Result<Option<Action>> {
         let mut chat_vos = self.chat_vos.lock().unwrap();
-        match self.list_state.selected() {
+        match self.list_state.lock().unwrap().selected() {
             Some(i) if i < chat_vos.len() => {
                 chat_vos.get_mut(i).and_then(|c| c.reset_unread());
                 let chat_vo = chat_vos.get(i).unwrap().clone();
@@ -293,11 +294,11 @@ impl Component for RecentChat {
         }
         match key.code {
             KeyCode::Down => {
-                self.list_state.select_next();
+                self.list_state.lock().unwrap().select_next();
                 self.send_chat()
             }
             KeyCode::Up => {
-                self.list_state.select_previous();
+                self.list_state.lock().unwrap().select_previous();
                 self.send_chat()
             }
             KeyCode::Enter => {
@@ -357,7 +358,7 @@ impl Component for RecentChat {
 
                 // We need to disambiguate this trait method as both `Widget` and `StatefulWidget` share the
                 // same method name `render`.
-                frame.render_stateful_widget(list, area, &mut self.list_state);
+                frame.render_stateful_widget(list, area, &mut self.list_state.lock().unwrap());
                 // 首次加载默认选中第一个
                 // TODO 首次加载第一个会出现双眼皮现象，暂时无法解决，后续再说吧
                 // let first_check = FIRST.lock().unwrap();
