@@ -83,7 +83,7 @@ impl ChatVo {
         None
     }
 
-    fn update(&mut self, chat_message: &ChatMessage) {
+    fn update(&mut self, chat_message: &ChatMessage, is_selected: bool) {
         match self {
             ChatVo::User {
                 mid,
@@ -95,7 +95,9 @@ impl ChatVo {
                 *mid = chat_message.mid;
                 *msg = chat_message.payload.detail.get_content();
                 *msg_time = chat_message.payload.created_at;
-                *unread = update_unread(unread)
+                if !is_selected {
+                    *unread = update_unread(unread)
+                }
             }
             ChatVo::Group {
                 uid,
@@ -111,7 +113,9 @@ impl ChatVo {
                 *mid = chat_message.mid;
                 *msg = chat_message.payload.detail.get_content();
                 *msg_time = chat_message.payload.created_at;
-                *unread = update_unread(unread)
+                if !is_selected {
+                    *unread = update_unread(unread)
+                }
             }
         }
     }
@@ -233,30 +237,31 @@ impl RecentChat {
     fn refresh(&mut self) {
         let chat_vos = Arc::clone(&self.chat_vos);
         let chat_rx = self.chat_rx.clone();
+        let selected_idx = self.list_state.selected().unwrap_or_default();
         tokio::spawn(async move {
             while let Ok(chat_message) = chat_rx.lock().await.recv().await {
                 debug!("received chat_message: {:?}", chat_message);
                 match chat_message.payload.target {
                     MessageTarget::User(target_user) => {
                         let mut guard = chat_vos.lock().unwrap();
-                        guard.iter_mut().for_each(|c| {
+                        guard.iter_mut().enumerate().for_each(|(idx, c)| {
                             if let ChatVo::User { uid, .. } = c {
                                 if *uid == target_user.uid || *uid == chat_message.payload.from_uid
                                 {
-                                    c.update(&chat_message);
+                                    c.update(&chat_message, selected_idx == idx);
                                 }
                             }
                         });
                     }
                     MessageTarget::Group(target_group) => {
                         let mut guard = chat_vos.lock().unwrap();
-                        guard.iter_mut().for_each(|c| {
+                        guard.iter_mut().enumerate().for_each(|(idx, c)| {
                             if let ChatVo::Group { gid, .. } = c {
                                 if *gid == target_group.gid
                                     || CURRENT_USER.get_user().user.unwrap().id
                                         == chat_message.payload.from_uid
                                 {
-                                    c.update(&chat_message);
+                                    c.update(&chat_message, selected_idx == idx);
                                 }
                             }
                         });
