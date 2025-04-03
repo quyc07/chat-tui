@@ -6,7 +6,7 @@ use crate::components::user_input::{InputData, UserInput};
 use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy;
-use crate::proxy::HOST;
+use crate::proxy::{user, HOST};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
@@ -134,32 +134,53 @@ impl Chat {
                         if let Some(ChatVo::User { uid, .. }) =
                             chat_vo_current.lock().unwrap().chat_vo
                         {
-                            if uid == target_user.uid || uid == chat_message.payload.from_uid {
+                            let user = CURRENT_USER.get_user().user.unwrap();
+                            if user.id == target_user.uid {
                                 let history = UserHistoryMsg {
                                     mid: chat_message.mid,
                                     msg: chat_message.payload.detail.get_content(),
                                     time: chat_message.payload.created_at,
                                     from_uid: chat_message.payload.from_uid,
-                                    from_name: "friend".to_string(),
+                                    from_name: user::detail_by_id(chat_message.payload.from_uid)
+                                        .unwrap()
+                                        .name
+                                        .clone(),
                                 };
                                 let mut guard = chat_history.lock().unwrap();
                                 guard.push(ChatHistory::User(history));
-                            }
+                            } else if user.id == chat_message.payload.from_uid {
+                                let history = UserHistoryMsg {
+                                    mid: chat_message.mid,
+                                    msg: chat_message.payload.detail.get_content(),
+                                    time: chat_message.payload.created_at,
+                                    from_uid: chat_message.payload.from_uid,
+                                    from_name: user.name.clone(),
+                                };
+                                let mut guard = chat_history.lock().unwrap();
+                                guard.push(ChatHistory::User(history));
+                            };
                         }
                     }
                     MessageTarget::Group(target_group) => {
                         let option = chat_vo_current.lock().unwrap().chat_vo.clone();
                         if let Some(ChatVo::Group { gid, .. }) = option {
-                            if gid == target_group.gid
-                                || CURRENT_USER.get_user().user.unwrap().id
+                            if gid == target_group.gid {
+                                let from_name = if CURRENT_USER.get_user().user.unwrap().id
                                     == chat_message.payload.from_uid
-                            {
+                                {
+                                    CURRENT_USER.get_user().user.unwrap().name.clone()
+                                } else {
+                                    user::detail_by_id(chat_message.payload.from_uid)
+                                        .unwrap()
+                                        .name
+                                        .clone()
+                                };
                                 let history = GroupHistoryMsg {
                                     mid: chat_message.mid,
                                     msg: chat_message.payload.detail.get_content(),
                                     time: chat_message.payload.created_at,
                                     from_uid: chat_message.payload.from_uid,
-                                    name_of_from_uid: "friend_in_group".to_string(),// TODO 获取用户名
+                                    name_of_from_uid: from_name,
                                 };
                                 let mut guard = chat_history.lock().unwrap();
                                 guard.push(ChatHistory::Group(history));

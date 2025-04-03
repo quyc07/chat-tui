@@ -5,7 +5,7 @@ use crate::components::event::{ChatMessage, MessageTarget};
 use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy;
-use crate::proxy::HOST;
+use crate::proxy::{user, HOST};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
@@ -107,7 +107,7 @@ impl ChatVo {
                 ..
             } => {
                 *uid = *uid;
-                *user_name = "friend_in_group".to_string(); // TODO 获取用户名
+                *user_name = user::detail_by_id(*uid).unwrap().name.clone();
                 *mid = chat_message.mid;
                 *msg = chat_message.payload.detail.get_content();
                 *msg_time = chat_message.payload.created_at;
