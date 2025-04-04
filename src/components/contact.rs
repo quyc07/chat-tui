@@ -85,20 +85,19 @@ impl Component for Contact {
                     }
                     _ => {}
                 },
-                State::Search => {}
-            }
-            match key.code {
-                KeyCode::Enter => {
-                    self.user_input.submit_message();
-                    self.search();
-                    self.user_input.reset();
-                }
-                KeyCode::Char(to_insert) => self.user_input.enter_char(to_insert),
-                KeyCode::Backspace => self.user_input.delete_char(),
-                KeyCode::Left => self.user_input.move_cursor_left(),
-                KeyCode::Right => self.user_input.move_cursor_right(),
-                KeyCode::Esc => self.next_state(),
-                _ => {}
+                State::Search => match key.code {
+                    KeyCode::Enter => {
+                        self.user_input.submit_message();
+                        self.search();
+                        self.user_input.reset();
+                    }
+                    KeyCode::Char(to_insert) => self.user_input.enter_char(to_insert),
+                    KeyCode::Backspace => self.user_input.delete_char(),
+                    KeyCode::Left => self.user_input.move_cursor_left(),
+                    KeyCode::Right => self.user_input.move_cursor_right(),
+                    KeyCode::Esc => self.next_state(),
+                    _ => {}
+                },
             }
         }
         Ok(None)
@@ -147,7 +146,6 @@ impl Component for Contact {
                     .block(block);
             frame.render_widget(user_input, search_area);
             if self.state == State::Search {
-                self.user_input.is_editing = true;
                 self.user_input.set_cursor_position(search_area)
             }
         }
