@@ -3,6 +3,8 @@ use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
 use crate::components::{area_util, Component};
+use crate::proxy::friend;
+use crate::proxy::friend::Friend;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
@@ -10,14 +12,19 @@ use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListSta
 use ratatui::{symbols, Frame};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use tracing::info;
+use tracing::{error, info};
 
 pub(crate) struct Contact {
     mode_holder: ModeHolderLock,
-    friends: Arc<Mutex<Vec<Friend>>>,
+    friends_holder: FriendsHolder,
     list_state: ListState,
     user_input: UserInput,
     state: State,
+}
+
+struct FriendsHolder {
+    need_fetch: bool,
+    friends: Arc<Mutex<Vec<Friend>>>,
 }
 
 #[derive(Default, Eq, PartialEq)]
@@ -27,27 +34,14 @@ enum State {
     Search,
 }
 
-#[derive(Serialize, Deserialize)]
-struct Friend {
-    id: i32,
-    name: String,
-}
-
-impl From<&Friend> for Text<'_> {
-    fn from(friend: &Friend) -> Self {
-        Line::from(Span::styled(
-            format!("好友: {}\n", friend.name),
-            Style::default().fg(Color::White),
-        ))
-        .into()
-    }
-}
-
 impl Contact {
     pub(crate) fn new(mode_holder: ModeHolderLock) -> Self {
         Self {
             mode_holder,
-            friends: Arc::new(Mutex::new(vec![])),
+            friends_holder: FriendsHolder {
+                need_fetch: true,
+                friends: Arc::new(Mutex::new(Vec::new())),
+            },
             list_state: Default::default(),
             user_input: UserInput::new(InputData::Search {
                 label: Some("Press e to search new friend here.".to_string()),
@@ -83,6 +77,12 @@ impl Component for Contact {
                     KeyCode::Char('e') => {
                         self.next_state();
                     }
+                    KeyCode::Up => {
+                        self.list_state.select_previous()
+                    }
+                    KeyCode::Down => {
+                        self.list_state.select_next()
+                    }
                     _ => {}
                 },
                 State::Search => match key.code {
@@ -104,6 +104,19 @@ impl Component for Contact {
     }
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
+        if self.mode_holder.get_mode() == Mode::Contact {
+            if self.state == State::Friends && self.friends_holder.need_fetch {
+                match friend::friends() {
+                    Ok(friends) => {
+                        self.friends_holder.need_fetch = false;
+                        self.friends_holder.friends = Arc::new(Mutex::new(friends));
+                    }
+                    Err(err) => {
+                        error!("Failed to get friends: {}", err);
+                    }
+                };
+            }
+        }
         Ok(None)
     }
 
@@ -120,6 +133,7 @@ impl Component for Contact {
 
             // Iterate through all elements in the `items` and stylize them.
             let items: Vec<ListItem> = self
+                .friends_holder
                 .friends
                 .lock()
                 .unwrap()
