@@ -1,11 +1,11 @@
 use crate::datetime::datetime_format;
 use crate::datetime::opt_datetime_format;
-use crate::proxy::{send_request, HOST};
+use crate::proxy::{HOST, send_request};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
-use reqwest::blocking::Client;
 use reqwest::StatusCode;
+use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -49,6 +49,36 @@ pub(crate) fn detail_by_id(uid: i32) -> color_eyre::Result<UserDetail> {
                 )),
             },
             Err(err) => Err(format_err!("Failed to get detail by uid {uid} : {}", err)),
+        }
+    })?
+}
+
+pub(crate) fn search(name: String) -> color_eyre::Result<Vec<UserDetail>> {
+    send_request(move || {
+        let current_user = CURRENT_USER.get_user();
+        let token = current_user.token.clone().unwrap();
+        let res = Client::new()
+            .get(format!("{HOST}/user/search/{name}"))
+            .header("Authorization", format!("Bearer {token}"))
+            .send();
+        match res {
+            Ok(res) => match res.status() {
+                StatusCode::OK => {
+                    let res = res.json::<Vec<UserDetail>>();
+                    res.or_else(|err| {
+                        Err(format_err!(
+                            "Failed to search user, name: {name}, err: {err}"
+                        ))
+                    })
+                }
+                _ => Err(format_err!(
+                    "Failed to search user, name: {name}, status: {}",
+                    res.status()
+                )),
+            },
+            Err(err) => Err(format_err!(
+                "Failed to search user, name: {name}, err: {err}"
+            )),
         }
     })?
 }

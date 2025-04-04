@@ -1,11 +1,11 @@
 use crate::action::Action;
 use crate::components::Component;
 use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::prelude::{Color, Style};
 use ratatui::widgets::Widget;
-use ratatui::Frame;
 
 pub(crate) struct UserInput {
     /// 当前文本框内容

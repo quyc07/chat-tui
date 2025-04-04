@@ -1,5 +1,5 @@
-pub mod user;
 pub mod friend;
+pub mod user;
 
 use color_eyre::eyre::format_err;
 use tokio::task::spawn_blocking;
