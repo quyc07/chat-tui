@@ -1,11 +1,11 @@
 use crate::datetime::datetime_format;
 use crate::datetime::opt_datetime_format;
-use crate::proxy::{send_request, HOST};
+use crate::proxy::{HOST, send_request};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
-use reqwest::blocking::Client;
 use reqwest::StatusCode;
+use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

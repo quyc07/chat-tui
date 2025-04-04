@@ -42,7 +42,6 @@ impl ChatVoHolder {
         self.chat_vo = Some(chat_vo);
         self.need_fetch = true;
     }
-
 }
 
 pub(crate) struct Chat {
@@ -133,9 +132,7 @@ impl Chat {
                 debug!("received chat_message: {:?}", chat_message);
                 match chat_message.payload.target {
                     MessageTarget::User(target_user) => {
-                        if let Some(ChatVo::User { .. }) =
-                            chat_vo_current.lock().unwrap().chat_vo
-                        {
+                        if let Some(ChatVo::User { .. }) = chat_vo_current.lock().unwrap().chat_vo {
                             let user = CURRENT_USER.get_user().user.unwrap();
                             if user.id == target_user.uid {
                                 let history = UserHistoryMsg {
@@ -219,9 +216,7 @@ impl Chat {
                     Err(err) => Err(format_err!("Failed to fetch chat history:{}", err)),
                 }
             }
-            ChatVo::Group {
-                gid, ..
-            } => {
+            ChatVo::Group { gid, .. } => {
                 match proxy::send_request(move || fetch_group_history(gid))? {
                     Ok(chat_history) => {
                         let last_mid = chat_history.last().unwrap().mid;
@@ -254,7 +249,7 @@ impl ChatHistory {
                 mid: _mid,
                 msg,
                 time,
-                from_uid:_,
+                from_uid: _,
                 from_name,
             }) => {
                 vec![
@@ -272,7 +267,7 @@ impl ChatHistory {
                 mid: _mid,
                 msg,
                 time,
-                from_uid:_,
+                from_uid: _,
                 name_of_from_uid,
             }) => {
                 vec![
