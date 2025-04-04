@@ -1,10 +1,10 @@
-use crate::proxy::HOST;
 use crate::proxy::send_request;
+use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use color_eyre::eyre::format_err;
 use ratatui::prelude::{Color, Line, Span, Style, Text};
-use reqwest::StatusCode;
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -35,12 +35,12 @@ pub(crate) fn friends() -> color_eyre::Result<Vec<Friend>> {
             Ok(res) => match res.status() {
                 StatusCode::OK => {
                     let res = res.json::<Vec<Friend>>();
-                    res.or_else(|err| {
-                        Err(format_err!(
+                    res.map_err(|err| {
+                        format_err!(
                             "Failed to get friends, id: {}, err: {}",
                             current_user.user.unwrap().id,
                             err
-                        ))
+                        )
                     })
                 }
                 _ => Err(format_err!(

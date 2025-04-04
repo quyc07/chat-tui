@@ -11,7 +11,6 @@ use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
-use futures::future::err;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style};
 use ratatui::widgets::{
@@ -23,7 +22,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::broadcast::Receiver;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> = LazyLock::new(|| {
     Arc::new(Mutex::new(ChatVoHolder {
@@ -44,15 +43,6 @@ impl ChatVoHolder {
         self.need_fetch = true;
     }
 
-    fn get_target_name(&self) -> String {
-        match &self.chat_vo {
-            None => "未知对象".to_string(),
-            Some(chat_vo) => match chat_vo {
-                ChatVo::User { user_name, .. } => user_name.to_string(),
-                ChatVo::Group { group_name, .. } => group_name.to_string(),
-            },
-        }
-    }
 }
 
 pub(crate) struct Chat {
@@ -143,7 +133,7 @@ impl Chat {
                 debug!("received chat_message: {:?}", chat_message);
                 match chat_message.payload.target {
                     MessageTarget::User(target_user) => {
-                        if let Some(ChatVo::User { uid, .. }) =
+                        if let Some(ChatVo::User { .. }) =
                             chat_vo_current.lock().unwrap().chat_vo
                         {
                             let user = CURRENT_USER.get_user().user.unwrap();
@@ -207,14 +197,14 @@ impl Chat {
     fn fetch_history(&mut self, chat_vo: ChatVo) -> color_eyre::Result<Option<Action>> {
         self.chat_history.lock().unwrap().clear();
         match chat_vo {
-            ChatVo::User { uid, user_name, .. } => {
+            ChatVo::User { uid, .. } => {
                 match proxy::send_request(move || fetch_user_history(uid))? {
                     Ok(chat_history) => {
                         let last_mid = chat_history.last().unwrap().mid;
                         let mut guard = self.chat_history.lock().unwrap();
                         chat_history
                             .into_iter()
-                            .map(|m| ChatHistory::User(m))
+                            .map(ChatHistory::User)
                             .for_each(|c| guard.push(c));
                         // 更新 已读索引
                         proxy::send_request(move || {
@@ -230,7 +220,7 @@ impl Chat {
                 }
             }
             ChatVo::Group {
-                gid, group_name, ..
+                gid, ..
             } => {
                 match proxy::send_request(move || fetch_group_history(gid))? {
                     Ok(chat_history) => {
@@ -238,7 +228,7 @@ impl Chat {
                         let mut guard = self.chat_history.lock().unwrap();
                         chat_history
                             .into_iter()
-                            .map(|m| ChatHistory::Group(m))
+                            .map(ChatHistory::Group)
                             .for_each(|c| guard.push(c));
                         // 更新 已读索引
                         proxy::send_request(move || {
@@ -264,7 +254,7 @@ impl ChatHistory {
                 mid: _mid,
                 msg,
                 time,
-                from_uid,
+                from_uid:_,
                 from_name,
             }) => {
                 vec![
@@ -273,7 +263,7 @@ impl ChatHistory {
                         Style::default().fg(Color::White),
                     )),
                     Line::from(Span::styled(
-                        format!("{msg}"),
+                        msg.to_string(),
                         Style::default().fg(Color::Green),
                     )),
                 ]
@@ -282,7 +272,7 @@ impl ChatHistory {
                 mid: _mid,
                 msg,
                 time,
-                from_uid,
+                from_uid:_,
                 name_of_from_uid,
             }) => {
                 vec![
@@ -291,7 +281,7 @@ impl ChatHistory {
                         Style::default().fg(Color::White),
                     )),
                     Line::from(Span::styled(
-                        format!("{msg}"),
+                        msg.to_string(),
                         Style::default().fg(Color::Green),
                     )),
                 ]
@@ -380,8 +370,7 @@ impl Component for Chat {
                 let chat_history = self.chat_history.lock().unwrap();
                 let items = chat_history
                     .iter()
-                    .map(|chat_history| chat_history.convert_lines())
-                    .flatten()
+                    .flat_map(|chat_history| chat_history.convert_lines())
                     .collect::<Vec<_>>();
                 let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                     .begin_symbol(Some("↑"))
@@ -477,7 +466,7 @@ fn fetch_user_history(target_uid: i32) -> color_eyre::Result<Vec<UserHistoryMsg>
         Ok(res) => match res.status() {
             StatusCode::OK => {
                 let res = res.json::<Vec<UserHistoryMsg>>();
-                res.or_else(|e| Err(format_err!("Failed to get chat history :{}", e)))
+                res.map_err(|e| format_err!("Failed to get chat history :{}", e))
             }
             _ => Err(format_err!("Failed to get chat history:{}", res.status())),
         },
@@ -521,7 +510,7 @@ fn fetch_group_history(gid: i32) -> color_eyre::Result<Vec<GroupHistoryMsg>> {
         Ok(res) => match res.status() {
             StatusCode::OK => {
                 let res = res.json::<Vec<GroupHistoryMsg>>();
-                res.or_else(|e| Err(format_err!("Failed to get chat history :{}", e)))
+                res.map_err(|e| format_err!("Failed to get chat history :{}", e))
             }
             _ => Err(format_err!("Failed to get chat history:{}", res.status())),
         },

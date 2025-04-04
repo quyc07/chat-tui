@@ -20,7 +20,6 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
-use tokio::task::spawn_blocking;
 use tracing::error;
 
 pub(crate) struct Login {

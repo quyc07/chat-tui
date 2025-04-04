@@ -2,14 +2,14 @@ use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::proxy::friend::Friend;
 use crate::proxy::{friend, user};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
 use std::sync::{Arc, Mutex};
 use tracing::error;
 
@@ -97,8 +97,7 @@ impl Contact {
             .lock()
             .unwrap()
             .iter()
-            .enumerate()
-            .map(|(_, friend)| ListItem::new(Text::from(friend)))
+            .map(|friend| ListItem::new(Text::from(friend)))
             .collect();
 
         // Create a List from all list items and highlight the currently selected one
@@ -187,18 +186,19 @@ impl Component for Contact {
     }
 
     fn update(&mut self, _action: Action) -> color_eyre::Result<Option<Action>> {
-        if self.mode_holder.get_mode() == Mode::Contact {
-            if self.state == State::Friends && self.friends_holder.need_fetch {
-                match friend::friends() {
-                    Ok(friends) => {
-                        self.friends_holder.need_fetch = false;
-                        self.friends_holder.friends = Arc::new(Mutex::new(friends));
-                    }
-                    Err(err) => {
-                        error!("Failed to get friends: {}", err);
-                    }
-                };
-            }
+        if self.mode_holder.get_mode() == Mode::Contact
+            && self.state == State::Friends
+            && self.friends_holder.need_fetch
+        {
+            match friend::friends() {
+                Ok(friends) => {
+                    self.friends_holder.need_fetch = false;
+                    self.friends_holder.friends = Arc::new(Mutex::new(friends));
+                }
+                Err(err) => {
+                    error!("Failed to get friends: {}", err);
+                }
+            };
         }
         Ok(None)
     }

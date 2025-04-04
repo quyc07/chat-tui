@@ -1,11 +1,11 @@
 use crate::datetime::datetime_format;
 use crate::datetime::opt_datetime_format;
-use crate::proxy::{HOST, send_request};
+use crate::proxy::{send_request, HOST};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
-use reqwest::StatusCode;
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -41,7 +41,7 @@ pub(crate) fn detail_by_id(uid: i32) -> color_eyre::Result<UserDetail> {
             Ok(res) => match res.status() {
                 StatusCode::OK => {
                     let res = res.json::<UserDetail>();
-                    res.or_else(|e| Err(format_err!("Failed to get detail by uid {uid} :{}", e)))
+                    res.map_err(|e| format_err!("Failed to get detail by uid {uid} :{}", e))
                 }
                 _ => Err(format_err!(
                     "Failed to get detail by uid {uid} :{}",
@@ -65,10 +65,8 @@ pub(crate) fn search(name: String) -> color_eyre::Result<Vec<UserDetail>> {
             Ok(res) => match res.status() {
                 StatusCode::OK => {
                     let res = res.json::<Vec<UserDetail>>();
-                    res.or_else(|err| {
-                        Err(format_err!(
-                            "Failed to search user, name: {name}, err: {err}"
-                        ))
+                    res.map_err(|err| {
+                        format_err!("Failed to search user, name: {name}, err: {err}")
                     })
                 }
                 _ => Err(format_err!(

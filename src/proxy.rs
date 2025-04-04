@@ -12,5 +12,5 @@ where
     R: Send + 'static,
 {
     let join_handle = spawn_blocking(f);
-    futures::executor::block_on(join_handle).map_err(|e| format_err!("failed to send request"))
+    futures::executor::block_on(join_handle).map_err(|e| format_err!("failed to send request:{e}"))
 }

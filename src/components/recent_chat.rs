@@ -1,11 +1,11 @@
 use crate::action::Action;
-use crate::app::{Mode, ModeHolderLock, SHOULD_QUIT};
+use crate::app::{Mode, ModeHolderLock};
 use crate::components::chat::CHAT_VO;
 use crate::components::event::{ChatMessage, MessageTarget};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy;
-use crate::proxy::{HOST, user};
+use crate::proxy::{user, HOST};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
@@ -15,7 +15,7 @@ use ratatui::style::palette::tailwind::{BLUE, GREEN, SKY, SLATE};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
@@ -108,7 +108,6 @@ impl ChatVo {
                 unread,
                 ..
             } => {
-                *uid = *uid;
                 *user_name = user::detail_by_id(*uid).unwrap().name.clone();
                 *mid = chat_message.mid;
                 *msg = chat_message.payload.detail.get_content();
@@ -346,8 +345,7 @@ impl Component for RecentChat {
                     .lock()
                     .unwrap()
                     .iter()
-                    .enumerate()
-                    .map(|(_, chat_vo)| ListItem::new(Text::from(chat_vo)))
+                    .map(|chat_vo| ListItem::new(Text::from(chat_vo)))
                     .collect();
 
                 // Create a List from all list items and highlight the currently selected one
