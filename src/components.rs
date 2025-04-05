@@ -14,6 +14,7 @@ pub mod chat;
 pub mod contact;
 pub mod event;
 pub mod fps;
+pub mod group_manager;
 pub mod login;
 pub mod navigation;
 pub mod recent_chat;
