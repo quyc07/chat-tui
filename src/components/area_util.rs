@@ -65,3 +65,7 @@ pub(crate) fn alert_area(rect: Rect) -> Rect {
 pub(crate) fn contact_area(rect: Rect) -> Rect {
     dynamic_area(rect)
 }
+
+pub(crate) fn group_manager_area(rect: Rect) -> Rect {
+    chat(rect)
+}

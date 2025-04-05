@@ -9,6 +9,7 @@ use tracing::{debug, info};
 use crate::components::alert::Alert;
 use crate::components::chat::Chat;
 use crate::components::contact::Contact;
+use crate::components::group_manager::GroupManager;
 use crate::components::login::Login;
 use crate::components::navigation::Navigation;
 use crate::components::recent_chat::RecentChat;
@@ -52,6 +53,7 @@ pub enum Mode {
     Chat,
     Contact,
     Setting,
+    GroupManager,
     Alert,
 }
 
@@ -93,6 +95,7 @@ impl App {
         let recent_chat = RecentChat::new(mode_holder.clone(), chat_rx);
         let chat = Chat::new(mode_holder.clone(), chat_rx1);
         let contact = Contact::new(mode_holder.clone());
+        let group_manager = GroupManager::new(mode_holder.clone());
         Ok(Self {
             tick_rate,
             frame_rate,
@@ -104,6 +107,7 @@ impl App {
                 Box::new(chat),
                 Box::new(event),
                 Box::new(contact),
+                Box::new(group_manager),
             ],
             should_suspend: false,
             config: Config::new()?,

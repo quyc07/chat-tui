@@ -18,7 +18,7 @@ pub enum Action {
     Confirm(ConfirmEvent),
     NextTab,
     Register,
-    InviteFriend,
+    Group(i32),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Display, Serialize, Deserialize)]

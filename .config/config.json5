@@ -17,6 +17,10 @@
       "<Ctrl-c>": "Quit",
       "<Tab>": "NextTab"
     },
+    "GroupManager": {
+      "<Ctrl-c>": "Quit",
+      "<Tab>": "NextTab"
+    },
     "Setting": {
       "<Ctrl-c>": "Quit",
       "<Tab>": "NextTab"

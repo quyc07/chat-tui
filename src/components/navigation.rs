@@ -100,7 +100,7 @@ impl Component for Navigation {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
         match self.mode_holder.get_mode() {
-            Mode::RecentChat | Mode::Chat | Mode::Contact | Mode::Setting => {
+            Mode::RecentChat | Mode::Chat | Mode::Contact | Mode::GroupManager | Mode::Setting => {
                 let navigation_area = area_util::navigation_area(area);
                 let titles = NavigationItem::iter().map(NavigationItem::title);
                 let highlight_style = (Color::default(), self.item.palette().c700);

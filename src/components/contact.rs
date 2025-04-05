@@ -237,3 +237,13 @@ impl Component for Contact {
         Ok(())
     }
 }
+
+impl From<&Friend> for Text<'_> {
+    fn from(friend: &Friend) -> Self {
+        Line::from(Span::styled(
+            format!("好友: {}\n", friend.name),
+            Style::default().fg(Color::White),
+        ))
+        .into()
+    }
+}

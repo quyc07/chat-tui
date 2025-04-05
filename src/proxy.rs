@@ -1,4 +1,5 @@
 pub mod friend;
+pub mod group;
 pub mod user;
 
 use color_eyre::eyre::format_err;

@@ -314,6 +314,13 @@ impl Component for Chat {
                 KeyCode::Char('e') => {
                     self.next_state();
                 }
+                KeyCode::Char('m') => match CHAT_VO.lock().unwrap().chat_vo.clone() {
+                    None => {}
+                    Some(chat_vo) => match chat_vo {
+                        ChatVo::User { .. } => {}
+                        ChatVo::Group { gid, .. } => return Ok(Some(Action::Group(gid))),
+                    },
+                },
                 _ => {}
             },
             ChatState::Chat => match key.code {
@@ -362,9 +369,7 @@ impl Component for Chat {
                     Layout::vertical([Constraint::Fill(1), Constraint::Length(6)]).areas(area);
 
                 let chat_history_title = match CHAT_VO.lock().unwrap().chat_vo.clone() {
-                    Some(ChatVo::Group { .. }) => {
-                        "Press ↑↓ To Scroll, Ctrl-i to invite new friend."
-                    }
+                    Some(ChatVo::Group { .. }) => "Press ↑↓ To Scroll, Press m To Manage Group.",
                     _ => "Press ↑↓ To Scroll.",
                 };
                 let chat_history_block = Block::new()
