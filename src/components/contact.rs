@@ -45,7 +45,7 @@ impl Contact {
             search_result: Arc::new(Mutex::new(Vec::new())),
             list_state: Default::default(),
             user_input: UserInput::new(InputData::Search {
-                label: Some("Press e to search new friend here.".to_string()),
+                label: Some("Press e To Search New Friend Here.".to_string()),
                 data: None,
             }),
             state: Default::default(),

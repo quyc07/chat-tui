@@ -60,7 +60,7 @@ impl Chat {
             chat_history: Arc::new(Mutex::new(Vec::new())),
             scroll_bar: ScrollBar::default(),
             user_input: UserInput::new(InputData::ChatMsg {
-                label: Some("Press e to edit msg".to_string()),
+                label: Some("Press e To Edit Msg".to_string()),
                 data: None,
             }),
             chat_state: Default::default(),
@@ -334,18 +334,21 @@ impl Component for Chat {
     }
 
     fn update(&mut self, _action: Action) -> color_eyre::Result<Option<Action>> {
-        let mut chat_vo_guard = CHAT_VO.lock().unwrap();
         match self.mode_holder.get_mode() {
-            Mode::RecentChat | Mode::Chat
+            Mode::RecentChat => {
+                let mut chat_vo_guard = CHAT_VO.lock().unwrap();
                 if chat_vo_guard.chat_vo.is_some()
                     && chat_vo_guard.need_fetch
-                    && self.chat_state == ChatState::History =>
-            {
-                debug!("Chat need fetch, chat_vo={:?}", chat_vo_guard.chat_vo);
-                chat_vo_guard.need_fetch = false;
-                self.scroll_bar.reset();
-                let chat_vo = chat_vo_guard.chat_vo.clone().unwrap();
-                self.fetch_history(chat_vo)
+                    && self.chat_state == ChatState::History
+                {
+                    debug!("Chat need fetch, chat_vo={:?}", chat_vo_guard.chat_vo);
+                    chat_vo_guard.need_fetch = false;
+                    self.scroll_bar.reset();
+                    let chat_vo = chat_vo_guard.chat_vo.clone().unwrap();
+                    self.fetch_history(chat_vo)
+                } else {
+                    Ok(None)
+                }
             }
             _ => Ok(None),
         }
@@ -357,8 +360,15 @@ impl Component for Chat {
                 let area = area_util::chat(area);
                 let [chat_history_area, chat_area] =
                     Layout::vertical([Constraint::Fill(1), Constraint::Length(6)]).areas(area);
-                let block = Block::new()
-                    .title("Press ↑↓ To Scroll.")
+
+                let chat_history_title = match CHAT_VO.lock().unwrap().chat_vo.clone() {
+                    Some(ChatVo::Group { .. }) => {
+                        "Press ↑↓ To Scroll, Ctrl-i to invite new friend."
+                    }
+                    _ => "Press ↑↓ To Scroll.",
+                };
+                let chat_history_block = Block::new()
+                    .title(chat_history_title)
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_set(symbols::border::ROUNDED);
@@ -379,7 +389,7 @@ impl Component for Chat {
                     .content_length(content_length);
                 // .viewport_content_length(view_length);
                 let chat_history = Paragraph::new(items)
-                    .block(block)
+                    .block(chat_history_block)
                     .scroll((self.scroll_bar.vertical_scroll as u16, 0));
                 frame.render_widget(chat_history, chat_history_area);
                 frame.render_stateful_widget(

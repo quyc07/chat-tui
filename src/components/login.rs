@@ -324,14 +324,14 @@ impl Component for Login {
         let (msg, style) = match self.state {
             State::Normal => (
                 vec![
-                    "Press e to start editing, ".bold(),
-                    "Ctrl+S to login, ".bold(),
-                    "Ctrl+R to register.".bold(),
+                    "Press e To Start Editing, ".bold(),
+                    "Ctrl+S To Login, ".bold(),
+                    "Ctrl+R To Register.".bold(),
                 ],
                 Style::default().add_modifier(Modifier::RAPID_BLINK),
             ),
             State::UserNameEditing | State::PasswordEditing => (
-                vec!["Press Enter to move to next. ".into()],
+                vec!["Press Enter To Move To Next. ".into()],
                 Style::default(),
             ),
         };
