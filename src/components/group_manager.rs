@@ -1,16 +1,17 @@
 use crate::action::Action;
-use crate::app::{Mode, ModeHolder, ModeHolderLock};
+use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::proxy;
+use crate::proxy::friend;
 use crate::proxy::friend::Friend;
 use crate::proxy::group::{DetailRes, GroupUser};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
 use std::sync::{Arc, Mutex};
 use tracing::error;
 
@@ -19,10 +20,13 @@ pub(crate) struct GroupManager {
     user_input: UserInput,
     gid: Option<i32>,
     detail: Arc<Mutex<DetailRes>>,
+    friends: Arc<Mutex<Vec<Friend>>>,
     state: State,
-    list_state: ListState,
+    group_members_list_state: ListState,
+    friends_list_state: ListState,
 }
 
+#[derive(Eq, PartialEq)]
 enum State {
     GroupDetail,
     InviteFriend,
@@ -35,32 +39,29 @@ impl Component for GroupManager {
                 State::GroupDetail => match key.code {
                     KeyCode::Esc => {
                         self.mode_holder.set_mode(Mode::Chat);
+                        self.group_members_list_state.select(None);
                     }
                     KeyCode::Char('e') => {
                         self.next_state();
+                        self.fetch_friends();
+                        self.group_members_list_state.select(None);
                     }
-                    KeyCode::Up => self.list_state.select_previous(),
-                    KeyCode::Down => self.list_state.select_next(),
+                    KeyCode::Up => self.group_members_list_state.select_previous(),
+                    KeyCode::Down => self.group_members_list_state.select_next(),
                     _ => {}
                 },
                 State::InviteFriend => match key.code {
                     KeyCode::Esc => {
-                        self.mode_holder.set_mode(Mode::Chat);
-                    }
-                    KeyCode::Enter => {
-                        self.user_input.submit_message();
-                        // self.search(self.user_input.data().unwrap()); TODO
+                        self.friends_list_state.select(None);
+                        self.next_state();
+                        self.user_input.reset();
                     }
                     KeyCode::Char(to_insert) => self.user_input.enter_char(to_insert),
                     KeyCode::Backspace => self.user_input.delete_char(),
                     KeyCode::Left => self.user_input.move_cursor_left(),
                     KeyCode::Right => self.user_input.move_cursor_right(),
-                    KeyCode::Up => self.list_state.select_previous(),
-                    KeyCode::Down => self.list_state.select_next(),
-                    KeyCode::Esc => {
-                        // self.clean_search(); TODO
-                        self.next_state()
-                    }
+                    KeyCode::Up => self.friends_list_state.select_previous(),
+                    KeyCode::Down => self.friends_list_state.select_next(),
                     _ => {}
                 },
             }
@@ -87,10 +88,21 @@ impl Component for GroupManager {
             return Ok(());
         }
         let area = area_util::group_manager_area(area);
-        let [search_area, friend_area] =
+        let [search_area, group_member_area] =
             Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).areas(area);
+        let [group_member_area, friend_area] = match self.state {
+            State::GroupDetail => {
+                Layout::horizontal([Constraint::Percentage(100), Constraint::Percentage(0)])
+                    .areas(group_member_area)
+            }
+            State::InviteFriend => {
+                Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .areas(group_member_area)
+            }
+        };
+        if self.state == State::InviteFriend {}
         let list_block = Block::new()
-            .title("↑↓ To Switch, Enter to select friend.")
+            .title("Group Members(↑↓ Or Enter)")
             .title_alignment(Alignment::Center)
             .borders(Borders::ALL)
             .border_set(symbols::border::ROUNDED);
@@ -104,13 +116,17 @@ impl Component for GroupManager {
             .style(self.user_input.select_style())
             .block(search_block);
         frame.render_widget(user_input, search_area);
+        self.render_group_members(frame, group_member_area, list_block);
         match self.state {
-            State::GroupDetail => {
-                self.render_friends(frame, friend_area, list_block);
-            }
+            State::GroupDetail => {}
             State::InviteFriend => {
+                let list_block = Block::new()
+                    .title("Friends(↑↓ Or Enter)")
+                    .title_alignment(Alignment::Center)
+                    .borders(Borders::ALL)
+                    .border_set(symbols::border::ROUNDED);
                 self.user_input.set_cursor_position(search_area);
-                self.render_friend_search_res(frame, friend_area, list_block);
+                self.render_friends(frame, friend_area, list_block);
             }
         }
         Ok(())
@@ -122,7 +138,7 @@ impl GroupManager {
         Self {
             mode_holder,
             user_input: UserInput::new(InputData::Search {
-                label: Some("Invite Friend To Join Group".to_string()),
+                label: Some("Press e To Invite Friend To Join Group".to_string()),
                 data: None,
             }),
             gid: None,
@@ -131,12 +147,14 @@ impl GroupManager {
                 name: "".to_string(),
                 users: vec![],
             })),
+            friends: Arc::new(Mutex::new(vec![])),
             state: State::GroupDetail,
-            list_state: Default::default(),
+            group_members_list_state: Default::default(),
+            friends_list_state: Default::default(),
         }
     }
 
-    fn render_friends(&mut self, frame: &mut Frame, friend_area: Rect, block: Block) {
+    fn render_group_members(&mut self, frame: &mut Frame, friend_area: Rect, block: Block) {
         // Iterate through all elements in the `items` and stylize them.
         let items: Vec<ListItem> = self
             .detail
@@ -152,16 +170,24 @@ impl GroupManager {
             .block(block)
             .highlight_style(SELECTED_STYLE)
             .highlight_spacing(HighlightSpacing::Always);
-        frame.render_stateful_widget(list, friend_area, &mut self.list_state);
+        frame.render_stateful_widget(list, friend_area, &mut self.group_members_list_state);
     }
-    fn render_friend_search_res(&mut self, frame: &mut Frame, friend_area: Rect, block: Block) {
+    fn render_friends(&mut self, frame: &mut Frame, friend_area: Rect, block: Block) {
         let items: Vec<ListItem> = self
-            .detail
+            .friends
             .lock()
             .unwrap()
-            .users
             .iter()
-            .map(|gu| ListItem::new(Text::from(gu)))
+            .filter_map(|f| match self.user_input.input.clone() {
+                None => Some(ListItem::new(Text::from(f))),
+                Some(x) => {
+                    if f.name.contains(&x) {
+                        Some(ListItem::new(Text::from(f)))
+                    } else {
+                        None
+                    }
+                }
+            })
             .collect();
 
         // Create a List from all list items and highlight the currently selected one
@@ -169,7 +195,7 @@ impl GroupManager {
             .block(block)
             .highlight_style(SELECTED_STYLE)
             .highlight_spacing(HighlightSpacing::Always);
-        frame.render_stateful_widget(list, friend_area, &mut self.list_state);
+        frame.render_stateful_widget(list, friend_area, &mut self.friends_list_state);
     }
 
     fn next_state(&mut self) {
@@ -183,6 +209,17 @@ impl GroupManager {
                 self.user_input.is_editing = false;
             }
         }
+    }
+
+    fn fetch_friends(&mut self) {
+        match friend::friends() {
+            Ok(friends) => {
+                self.friends = Arc::new(Mutex::new(friends));
+            }
+            Err(err) => {
+                error!("Failed to get friends: {}", err);
+            }
+        };
     }
 }
 
