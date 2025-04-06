@@ -48,6 +48,9 @@ impl Component for GroupManager {
                     }
                     KeyCode::Up => self.group_members_list_state.select_previous(),
                     KeyCode::Down => self.group_members_list_state.select_next(),
+                    KeyCode::Enter => {
+                        //TODO 移出群，禁言，设为管理员
+                    }
                     _ => {}
                 },
                 State::InviteFriend => match key.code {
@@ -62,6 +65,9 @@ impl Component for GroupManager {
                     KeyCode::Right => self.user_input.move_cursor_right(),
                     KeyCode::Up => self.friends_list_state.select_previous(),
                     KeyCode::Down => self.friends_list_state.select_next(),
+                    KeyCode::Enter => {
+                        //TODO 加入群
+                    }
                     _ => {}
                 },
             }
