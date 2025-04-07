@@ -23,7 +23,5 @@ pub enum Action {
 
 #[derive(Clone, Debug, Eq, PartialEq, Display, Serialize, Deserialize)]
 pub enum ConfirmEvent {
-    Nothing,
-    Submit,
-    Score,
+    InviteFriend,
 }

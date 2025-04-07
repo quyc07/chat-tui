@@ -1,12 +1,12 @@
-use crate::action::Action;
+use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
 use crate::components::{area_util, Component};
 use crate::proxy;
-use crate::proxy::friend;
 use crate::proxy::friend::Friend;
 use crate::proxy::group::{DetailRes, GroupUser};
+use crate::proxy::{friend, group};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
@@ -66,7 +66,13 @@ impl Component for GroupManager {
                     KeyCode::Up => self.friends_list_state.select_previous(),
                     KeyCode::Down => self.friends_list_state.select_next(),
                     KeyCode::Enter => {
-                        //TODO 加入群
+                        if let Some(idx) = self.friends_list_state.selected() {
+                            let name = self.friends.lock().unwrap().get(idx).unwrap().name.clone();
+                            return Ok(Some(Action::Alert(
+                                format!("确定邀请{name}入群么？"),
+                                Some(ConfirmEvent::InviteFriend),
+                            )));
+                        }
                     }
                     _ => {}
                 },
@@ -76,15 +82,19 @@ impl Component for GroupManager {
     }
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
-        if let Action::Group(gid) = action {
-            self.gid = Some(gid);
-            self.mode_holder.set_mode(Mode::GroupManager);
-            match proxy::group::detail(gid) {
-                Ok(detail) => {
-                    self.detail = Arc::new(Mutex::new(detail));
-                }
-                Err(err) => error!("fail to fetch group detail: {}", err),
+        match action {
+            Action::Confirm(ConfirmEvent::InviteFriend) => {
+                self.mode_holder.set_mode(Mode::GroupManager);
+                self.invite_group_member();
+                self.next_state();
+                self.group_detail(self.gid.unwrap());
             }
+            Action::Group(gid) => {
+                self.gid = Some(gid);
+                self.mode_holder.set_mode(Mode::GroupManager);
+                self.group_detail(gid);
+            }
+            _ => {}
         }
         Ok(None)
     }
@@ -226,6 +236,27 @@ impl GroupManager {
                 error!("Failed to get friends: {}", err);
             }
         };
+    }
+
+    fn invite_group_member(&mut self) {
+        if let Some(idx) = self.friends_list_state.selected() {
+            if let Some(friend) = self.friends.lock().unwrap().get(idx) {
+                let uid = friend.id;
+                let gid = self.gid.unwrap();
+                if let Err(e) = group::invite(uid, gid) {
+                    error!("Failed to invite group :{e}");
+                };
+            }
+        }
+    }
+
+    fn group_detail(&mut self, gid: i32) {
+        match group::detail(gid) {
+            Ok(detail) => {
+                self.detail = Arc::new(Mutex::new(detail));
+            }
+            Err(err) => error!("fail to fetch group detail: {}", err),
+        }
     }
 }
 
