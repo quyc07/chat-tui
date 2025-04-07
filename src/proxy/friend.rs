@@ -2,7 +2,7 @@ use crate::proxy::HOST;
 use crate::proxy::send_request;
 use crate::token::CURRENT_USER;
 use color_eyre::eyre::format_err;
-use ratatui::prelude::{Color, Line, Span, Style, Text};
+use ratatui::prelude::{Line, Span, Style, Text};
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};

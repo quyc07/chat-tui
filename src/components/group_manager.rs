@@ -2,8 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{area_util, Component};
-use crate::proxy;
+use crate::components::{Component, area_util};
 use crate::proxy::friend::Friend;
 use crate::proxy::group::{DetailRes, GroupUser};
 use crate::proxy::{friend, group};
@@ -11,7 +10,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph};
-use ratatui::{symbols, Frame};
+use ratatui::{Frame, symbols};
 use std::sync::{Arc, Mutex};
 use tracing::error;
 
@@ -100,50 +99,52 @@ impl Component for GroupManager {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
-        if self.mode_holder.get_mode() != Mode::GroupManager {
-            return Ok(());
-        }
-        let area = area_util::group_manager_area(area);
-        let [search_area, group_member_area] =
-            Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).areas(area);
-        let [group_member_area, friend_area] = match self.state {
-            State::GroupDetail => {
-                Layout::horizontal([Constraint::Percentage(100), Constraint::Percentage(0)])
-                    .areas(group_member_area)
-            }
-            State::InviteFriend => {
-                Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .areas(group_member_area)
-            }
-        };
-        if self.state == State::InviteFriend {}
-        let list_block = Block::new()
-            .title("Group Members(↑↓ Or Enter)")
-            .title_alignment(Alignment::Center)
-            .borders(Borders::ALL)
-            .border_set(symbols::border::ROUNDED);
-
-        let search_block = Block::new()
-            .title(self.user_input.input_data.label())
-            .title_alignment(Alignment::Center)
-            .borders(Borders::ALL)
-            .border_set(symbols::border::ROUNDED);
-        let user_input = Paragraph::new(self.user_input.input.clone().unwrap_or("".to_string()))
-            .style(self.user_input.select_style())
-            .block(search_block);
-        frame.render_widget(user_input, search_area);
-        self.render_group_members(frame, group_member_area, list_block);
-        match self.state {
-            State::GroupDetail => {}
-            State::InviteFriend => {
+        match self.mode_holder.get_mode() {
+            Mode::GroupManager | Mode::Alert => {
+                let area = area_util::group_manager_area(area);
+                let [search_area, group_member_area] =
+                    Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).areas(area);
+                let [group_member_area, friend_area] = match self.state {
+                    State::GroupDetail => {
+                        Layout::horizontal([Constraint::Percentage(100), Constraint::Percentage(0)])
+                            .areas(group_member_area)
+                    }
+                    State::InviteFriend => {
+                        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+                            .areas(group_member_area)
+                    }
+                };
                 let list_block = Block::new()
-                    .title("Friends(↑↓ Or Enter)")
+                    .title("Group Members(↑↓ Or Enter)")
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_set(symbols::border::ROUNDED);
-                self.user_input.set_cursor_position(search_area);
-                self.render_friends(frame, friend_area, list_block);
+
+                let search_block = Block::new()
+                    .title(self.user_input.input_data.label())
+                    .title_alignment(Alignment::Center)
+                    .borders(Borders::ALL)
+                    .border_set(symbols::border::ROUNDED);
+                let user_input =
+                    Paragraph::new(self.user_input.input.clone().unwrap_or("".to_string()))
+                        .style(self.user_input.select_style())
+                        .block(search_block);
+                frame.render_widget(user_input, search_area);
+                self.render_group_members(frame, group_member_area, list_block);
+                match self.state {
+                    State::GroupDetail => {}
+                    State::InviteFriend => {
+                        let list_block = Block::new()
+                            .title("Friends(↑↓ Or Enter)")
+                            .title_alignment(Alignment::Center)
+                            .borders(Borders::ALL)
+                            .border_set(symbols::border::ROUNDED);
+                        self.user_input.set_cursor_position(search_area);
+                        self.render_friends(frame, friend_area, list_block);
+                    }
+                }
             }
+            _ => {}
         }
         Ok(())
     }

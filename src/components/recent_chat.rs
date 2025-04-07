@@ -329,7 +329,7 @@ impl Component for RecentChat {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
         match self.mode_holder.get_mode() {
-            Mode::RecentChat | Mode::Chat | Mode::GroupManager => {
+            Mode::RecentChat | Mode::Chat | Mode::GroupManager | Mode::Alert => {
                 let area = area_util::recent_chat(area);
                 let block = Block::new()
                     .title("↑↓ To Switch, Enter to Start Chat.")
