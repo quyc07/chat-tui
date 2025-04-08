@@ -36,13 +36,27 @@ enum State {
 #[derive(
     Eq, PartialEq, Clone, Copy, Debug, Display, FromRepr, EnumIter, Serialize, Deserialize,
 )]
+#[repr(u8)]
 pub(crate) enum ManageAction {
     #[strum(to_string = "移出群聊")]
-    Evict,
+    Evict = 0,
     #[strum(to_string = "禁言🤐")]
-    Forbid,
+    Forbid = 1,
+    #[strum(to_string = "解除禁言😄")]
+    UnForbid = 2,
     #[strum(to_string = "设为管理员")]
-    SetManager,
+    SetManager = 3,
+}
+
+impl ManageAction {
+    pub(crate) fn handle(&self, gid: i32, uid: i32) -> color_eyre::Result<()> {
+        match self {
+            ManageAction::Evict => group::evict(gid, uid),
+            ManageAction::Forbid => group::forbid(gid, uid),
+            ManageAction::UnForbid => group::un_forbid(gid, uid),
+            ManageAction::SetManager => group::set_manager(gid, uid),
+        }
+    }
 }
 
 impl From<ManageAction> for Text<'_> {
@@ -82,7 +96,6 @@ impl Component for GroupManager {
                     KeyCode::Up => self.group_members_list_state.select_previous(),
                     KeyCode::Down => self.group_members_list_state.select_next(),
                     KeyCode::Enter => {
-                        //TODO 移出群，禁言，设为管理员
                         if let Some(idx) = self.group_members_list_state.selected() {
                             let name = self
                                 .detail
@@ -135,6 +148,18 @@ impl Component for GroupManager {
                 self.mode_holder.set_mode(Mode::GroupManager);
                 self.invite_group_member();
                 self.next_state();
+                self.group_detail(self.gid.unwrap());
+            }
+            Action::Confirm(ConfirmEvent::GroupManage(Some(action))) => {
+                if let Some(idx) = self.group_members_list_state.selected() {
+                    let uid = self.detail.lock().unwrap().users.get(idx).unwrap().id;
+                    match action.handle(self.gid.unwrap(), uid) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error!("fail to handle action: {action}, err: {e}");
+                        }
+                    };
+                }
                 self.group_detail(self.gid.unwrap());
             }
             Action::Group(gid) => {

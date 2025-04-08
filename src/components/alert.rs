@@ -8,9 +8,9 @@ use ratatui::layout::{Alignment, Constraint, Layout, Margin, Rect};
 use ratatui::prelude::Text;
 use ratatui::style::Color;
 use ratatui::style::Style;
-use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Clear};
 use ratatui::widgets::{Borders, HighlightSpacing, List, ListItem};
+use ratatui::widgets::{ListState, Paragraph};
 use ratatui::{symbols, Frame};
 use strum::IntoEnumIterator;
 
@@ -23,19 +23,53 @@ pub struct Alert {
     confirm_event: Option<ConfirmEvent>,
     /// 上一个状态
     last_mode: Option<Mode>,
+    /// list state
+    list_state: ListState,
 }
 
 impl Component for Alert {
     fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {
         match self.mode_holder.get_mode() {
-            Mode::Alert => match key.code {
-                KeyCode::Enter if self.confirm_event.is_some() => {
-                    Ok(Some(Action::Confirm(self.confirm_event.clone().unwrap())))
-                }
-                KeyCode::Esc => {
-                    self.close();
-                    Ok(None)
-                }
+            Mode::Alert => match self.confirm_event {
+                Some(ConfirmEvent::InviteFriend) => match key.code {
+                    KeyCode::Enter => {
+                        let action = Action::Confirm(self.confirm_event.clone().unwrap());
+                        self.close();
+                        Ok(Some(action))
+                    }
+                    KeyCode::Esc => {
+                        self.close();
+                        Ok(None)
+                    }
+                    _ => Ok(None),
+                },
+                Some(ConfirmEvent::GroupManage(None)) => match key.code {
+                    KeyCode::Enter => {
+                        if let Some(idx) = self.list_state.selected() {
+                            let action = Action::Confirm(ConfirmEvent::GroupManage(Some(
+                                ManageAction::from_repr(idx as u8).unwrap(),
+                            )));
+                            self.close();
+                            Ok(Some(action))
+                        } else {
+                            self.close();
+                            Ok(None)
+                        }
+                    }
+                    KeyCode::Up => {
+                        self.list_state.select_previous();
+                        Ok(None)
+                    }
+                    KeyCode::Down => {
+                        self.list_state.select_next();
+                        Ok(None)
+                    }
+                    KeyCode::Esc => {
+                        self.close();
+                        Ok(None)
+                    }
+                    _ => Ok(None),
+                },
                 _ => Ok(None),
             },
             _ => Ok(None),
@@ -72,12 +106,14 @@ impl Alert {
             mode_holder,
             confirm_event: None,
             last_mode: None,
+            list_state: ListState::default(),
         }
     }
 
     fn close(&mut self) {
         self.msg = DEFAULT_ALERT_MSG.to_string();
         self.confirm_event.take();
+        self.list_state.select(None);
         self.mode_holder.set_mode(self.last_mode.unwrap());
     }
 
@@ -108,9 +144,10 @@ impl Alert {
 
     fn draw_manage_action(&mut self, frame: &mut Frame, area: Rect) {
         let area = area_util::alert_area(area);
+        let count = ManageAction::iter().count();
         let [_, alert_area, _] = Layout::vertical([
             Constraint::Fill(1),
-            Constraint::Length(6),
+            Constraint::Length((count + 3) as u16),
             Constraint::Fill(1),
         ])
         .areas(area);
@@ -128,7 +165,7 @@ impl Alert {
         let [_, alert_msg_area, items_area, _] = Layout::vertical([
             Constraint::Length(1),
             Constraint::Length(1),
-            Constraint::Length(3),
+            Constraint::Length(count as u16),
             Constraint::Length(1),
         ])
         .areas(alert_area);
@@ -145,16 +182,16 @@ impl Alert {
         let items: Vec<ListItem> = ManageAction::iter()
             .map(|action| ListItem::new(Text::from(action)))
             .collect();
-        // Create a List from all list items and highlight the currently selected one
         let list = List::new(items)
             .highlight_style(SELECTED_STYLE)
             .highlight_spacing(HighlightSpacing::Always);
-        frame.render_widget(
+        frame.render_stateful_widget(
             list,
             items_area.inner(Margin {
-                horizontal: 2,
+                horizontal: 1,
                 vertical: 0,
             }),
+            &mut self.list_state,
         );
     }
 }

@@ -147,7 +147,9 @@ fn cal_padding(area: &Rect) -> usize {
 }
 #[cfg(test)]
 mod tests {
+    use strum::IntoEnumIterator;
     use unicode_width::UnicodeWidthStr;
+    use crate::components::navigation::NavigationItem;
 
     #[test]
     fn test_string_width() {
@@ -156,5 +158,11 @@ mod tests {
         println!("width: {width}, string: {string}");
         let width = UnicodeWidthStr::width_cjk(string.as_str());
         println!("width_cjk: {width}, string: {string}");
+    }
+
+    #[test]
+    fn test_len() {
+        let i = NavigationItem::iter().count();
+        println!("{}", i);
     }
 }
