@@ -232,37 +232,34 @@ impl Component for Contact {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
-        match self.mode_holder.get_mode() {
-            Mode::Contact => {
-                let area = area_util::contact_area(area);
-                let [search_area, friend_area] =
-                    Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).areas(area);
-                let list_block = Block::new()
-                    .title("↑↓ To Switch, Enter to select friend.")
-                    .title_alignment(Alignment::Center)
-                    .borders(Borders::ALL)
-                    .border_set(symbols::border::ROUNDED);
-                let search_block = Block::new()
-                    .title(self.user_input.input_data.label())
-                    .title_alignment(Alignment::Center)
-                    .borders(Borders::ALL)
-                    .border_set(symbols::border::ROUNDED);
-                let user_input =
-                    Paragraph::new(self.user_input.input.clone().unwrap_or("".to_string()))
-                        .style(self.user_input.select_style())
-                        .block(search_block);
-                frame.render_widget(user_input, search_area);
-                match self.state {
-                    State::Friends => {
-                        self.render_friends(frame, friend_area, list_block);
-                    }
-                    State::Search | State::AddFriend => {
-                        self.user_input.set_cursor_position(search_area);
-                        self.render_friend_search_res(frame, friend_area, list_block);
-                    }
+        if self.mode_holder.get_mode() == Mode::Contact {
+            let area = area_util::contact_area(area);
+            let [search_area, friend_area] =
+                Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).areas(area);
+            let list_block = Block::new()
+                .title("↑↓ To Switch, Enter to select friend.")
+                .title_alignment(Alignment::Center)
+                .borders(Borders::ALL)
+                .border_set(symbols::border::ROUNDED);
+            let search_block = Block::new()
+                .title(self.user_input.input_data.label())
+                .title_alignment(Alignment::Center)
+                .borders(Borders::ALL)
+                .border_set(symbols::border::ROUNDED);
+            let user_input =
+                Paragraph::new(self.user_input.input.clone().unwrap_or("".to_string()))
+                    .style(self.user_input.select_style())
+                    .block(search_block);
+            frame.render_widget(user_input, search_area);
+            match self.state {
+                State::Friends => {
+                    self.render_friends(frame, friend_area, list_block);
+                }
+                State::Search | State::AddFriend => {
+                    self.user_input.set_cursor_position(search_area);
+                    self.render_friend_search_res(frame, friend_area, list_block);
                 }
             }
-            _ => {}
         }
         Ok(())
     }

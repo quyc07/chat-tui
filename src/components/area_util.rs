@@ -88,11 +88,10 @@ pub(crate) fn cal_center_area(area: Rect, text: &str) -> Rect {
     // 2. 计算垂直居中的 y 坐标
     let paragraph_height = estimated_lines as u16 + 2; // +2 for border
     let y_offset = area.y + (area.height.saturating_sub(paragraph_height)) / 2;
-    let centered_area = Rect {
+    Rect {
         x: area.x,
         y: y_offset,
         width: area.width,
         height: paragraph_height.min(area.height),
-    };
-    centered_area
+    }
 }
