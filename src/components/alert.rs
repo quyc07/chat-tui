@@ -70,7 +70,10 @@ impl Component for Alert {
                     }
                     _ => Ok(None),
                 },
-                _ => Ok(None),
+                _ => {
+                    self.close();
+                    Ok(None)
+                },
             },
             _ => Ok(None),
         }

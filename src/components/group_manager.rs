@@ -6,6 +6,7 @@ use crate::components::{area_util, Component};
 use crate::proxy::friend::Friend;
 use crate::proxy::group::{DetailRes, GroupUser};
 use crate::proxy::{friend, group};
+use crate::token::CURRENT_USER;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
@@ -96,19 +97,36 @@ impl Component for GroupManager {
                     KeyCode::Up => self.group_members_list_state.select_previous(),
                     KeyCode::Down => self.group_members_list_state.select_next(),
                     KeyCode::Enter => {
-                        if let Some(idx) = self.group_members_list_state.selected() {
-                            let name = self
-                                .detail
-                                .lock()
-                                .unwrap()
-                                .users
-                                .get(idx)
-                                .unwrap()
-                                .name
-                                .clone();
+                        // 非管理员，无效
+                        let current_uid = CURRENT_USER.get_user().user.unwrap().id;
+                        if self
+                            .detail
+                            .lock()
+                            .unwrap()
+                            .users
+                            .iter()
+                            .find(move |gu| gu.admin && gu.id == current_uid)
+                            .is_some()
+                        {
+                            if let Some(idx) = self.group_members_list_state.selected() {
+                                let name = self
+                                    .detail
+                                    .lock()
+                                    .unwrap()
+                                    .users
+                                    .get(idx)
+                                    .unwrap()
+                                    .name
+                                    .clone();
+                                return Ok(Some(Action::Alert(
+                                    format!("你希望将{name}:"),
+                                    Some(ConfirmEvent::GroupManage(None)),
+                                )));
+                            }
+                        } else {
                             return Ok(Some(Action::Alert(
-                                format!("你希望将{name}:"),
-                                Some(ConfirmEvent::GroupManage(None)),
+                                "您不是管理员，无法操作".to_string(),
+                                None,
                             )));
                         }
                     }
