@@ -26,4 +26,5 @@ pub enum Action {
 pub enum ConfirmEvent {
     InviteFriend,
     GroupManage(Option<ManageAction>),
+    AddFriend(i32),
 }

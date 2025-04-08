@@ -1,4 +1,4 @@
-use crate::action::Action;
+use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
@@ -32,6 +32,7 @@ enum State {
     #[default]
     Friends,
     Search,
+    AddFriend,
 }
 
 impl Contact {
@@ -52,14 +53,18 @@ impl Contact {
         }
     }
 
-    fn next_state(&mut self) {
-        match self.state {
+    fn change_state(&mut self, state: State) {
+        match state {
             State::Friends => {
+                self.state = State::Friends;
+                self.user_input.is_editing = false;
+            }
+            State::Search => {
                 self.state = State::Search;
                 self.user_input.is_editing = true;
             }
-            State::Search => {
-                self.state = State::Friends;
+            State::AddFriend => {
+                self.state = State::AddFriend;
                 self.user_input.is_editing = false;
             }
         }
@@ -77,6 +82,7 @@ impl Contact {
                     users
                         .into_iter()
                         .map(|u| FriendSearchRes {
+                            id: u.id,
                             name: u.name,
                             is_friend: u.is_friend,
                         })
@@ -125,7 +131,9 @@ impl Contact {
     }
 }
 
+#[derive(Clone)]
 struct FriendSearchRes {
+    id: i32,
     name: String,
     is_friend: bool,
 }
@@ -157,7 +165,7 @@ impl Component for Contact {
             match self.state {
                 State::Friends => match key.code {
                     KeyCode::Char('e') => {
-                        self.next_state();
+                        self.change_state(State::Search);
                     }
                     KeyCode::Up => self.list_state.select_previous(),
                     KeyCode::Down => self.list_state.select_next(),
@@ -167,16 +175,32 @@ impl Component for Contact {
                     KeyCode::Enter => {
                         self.user_input.submit_message();
                         self.search(self.user_input.data().unwrap());
+                        self.change_state(State::AddFriend);
                     }
                     KeyCode::Char(to_insert) => self.user_input.enter_char(to_insert),
                     KeyCode::Backspace => self.user_input.delete_char(),
                     KeyCode::Left => self.user_input.move_cursor_left(),
                     KeyCode::Right => self.user_input.move_cursor_right(),
-                    KeyCode::Up => self.list_state.select_previous(),
-                    KeyCode::Down => self.list_state.select_next(),
                     KeyCode::Esc => {
                         self.clean_search();
-                        self.next_state()
+                        self.change_state(State::Friends)
+                    }
+                    _ => {}
+                },
+                State::AddFriend => match key.code {
+                    KeyCode::Up => self.list_state.select_previous(),
+                    KeyCode::Down => self.list_state.select_next(),
+                    KeyCode::Enter => {
+                        if let Some(idx) = self.list_state.selected() {
+                            let friend =
+                                self.search_result.lock().unwrap().get(idx).unwrap().clone();
+                            let uid = friend.id;
+                            let name = friend.name;
+                            return Ok(Some(Action::Alert(
+                                format!("要添加{name}为好友么？"),
+                                Some(ConfirmEvent::AddFriend(uid)),
+                            )));
+                        }
                     }
                     _ => {}
                 },
@@ -185,7 +209,7 @@ impl Component for Contact {
         Ok(None)
     }
 
-    fn update(&mut self, _action: Action) -> color_eyre::Result<Option<Action>> {
+    fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if self.mode_holder.get_mode() == Mode::Contact
             && self.state == State::Friends
             && self.friends_holder.need_fetch
@@ -200,39 +224,45 @@ impl Component for Contact {
                 }
             };
         }
+        if let Action::Confirm(ConfirmEvent::AddFriend(_)) = action {
+            self.clean_search();
+            self.change_state(State::Friends)
+        }
         Ok(None)
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
-        if self.mode_holder.get_mode() == Mode::Contact {
-            let area = area_util::contact_area(area);
-            let [search_area, friend_area] =
-                Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).areas(area);
-            let list_block = Block::new()
-                .title("↑↓ To Switch, Enter to select friend.")
-                .title_alignment(Alignment::Center)
-                .borders(Borders::ALL)
-                .border_set(symbols::border::ROUNDED);
-
-            let search_block = Block::new()
-                .title(self.user_input.input_data.label())
-                .title_alignment(Alignment::Center)
-                .borders(Borders::ALL)
-                .border_set(symbols::border::ROUNDED);
-            let user_input =
-                Paragraph::new(self.user_input.input.clone().unwrap_or("".to_string()))
-                    .style(self.user_input.select_style())
-                    .block(search_block);
-            frame.render_widget(user_input, search_area);
-            match self.state {
-                State::Friends => {
-                    self.render_friends(frame, friend_area, list_block);
-                }
-                State::Search => {
-                    self.user_input.set_cursor_position(search_area);
-                    self.render_friend_search_res(frame, friend_area, list_block);
+        match self.mode_holder.get_mode() {
+            Mode::Contact => {
+                let area = area_util::contact_area(area);
+                let [search_area, friend_area] =
+                    Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).areas(area);
+                let list_block = Block::new()
+                    .title("↑↓ To Switch, Enter to select friend.")
+                    .title_alignment(Alignment::Center)
+                    .borders(Borders::ALL)
+                    .border_set(symbols::border::ROUNDED);
+                let search_block = Block::new()
+                    .title(self.user_input.input_data.label())
+                    .title_alignment(Alignment::Center)
+                    .borders(Borders::ALL)
+                    .border_set(symbols::border::ROUNDED);
+                let user_input =
+                    Paragraph::new(self.user_input.input.clone().unwrap_or("".to_string()))
+                        .style(self.user_input.select_style())
+                        .block(search_block);
+                frame.render_widget(user_input, search_area);
+                match self.state {
+                    State::Friends => {
+                        self.render_friends(frame, friend_area, list_block);
+                    }
+                    State::Search | State::AddFriend => {
+                        self.user_input.set_cursor_position(search_area);
+                        self.render_friend_search_res(frame, friend_area, list_block);
+                    }
                 }
             }
+            _ => {}
         }
         Ok(())
     }

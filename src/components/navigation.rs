@@ -100,12 +100,7 @@ impl Component for Navigation {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
         match self.mode_holder.get_mode() {
-            Mode::RecentChat
-            | Mode::Chat
-            | Mode::Contact
-            | Mode::GroupManager
-            | Mode::Setting
-            | Mode::Alert => {
+            Mode::RecentChat | Mode::Chat | Mode::Contact | Mode::GroupManager | Mode::Setting => {
                 let navigation_area = area_util::navigation_area(area);
                 let titles = NavigationItem::iter().map(NavigationItem::title);
                 let highlight_style = (Color::default(), self.item.palette().c700);
@@ -147,9 +142,9 @@ fn cal_padding(area: &Rect) -> usize {
 }
 #[cfg(test)]
 mod tests {
+    use crate::components::navigation::NavigationItem;
     use strum::IntoEnumIterator;
     use unicode_width::UnicodeWidthStr;
-    use crate::components::navigation::NavigationItem;
 
     #[test]
     fn test_string_width() {

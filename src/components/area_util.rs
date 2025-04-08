@@ -69,3 +69,30 @@ pub(crate) fn contact_area(rect: Rect) -> Rect {
 pub(crate) fn group_manager_area(rect: Rect) -> Rect {
     chat(rect)
 }
+
+// 简单估算：按宽度估算换行后的行数
+fn estimate_line_count(text: &str, width: u16) -> usize {
+    text.lines()
+        .map(|line| {
+            let len = unicode_width::UnicodeWidthStr::width(line);
+            (len as f32 / width.max(1) as f32).ceil() as usize
+        })
+        .sum()
+}
+
+pub(crate) fn cal_center_area(area: Rect, text: &str) -> Rect {
+    // 1. 估算需要多少行（考虑终端宽度）
+    let text_width = area.width.saturating_sub(2); // 留出 Block 的边框
+    let estimated_lines = estimate_line_count(text, text_width);
+
+    // 2. 计算垂直居中的 y 坐标
+    let paragraph_height = estimated_lines as u16 + 2; // +2 for border
+    let y_offset = area.y + (area.height.saturating_sub(paragraph_height)) / 2;
+    let centered_area = Rect {
+        x: area.x,
+        y: y_offset,
+        width: area.width,
+        height: paragraph_height.min(area.height),
+    };
+    centered_area
+}

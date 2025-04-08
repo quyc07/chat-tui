@@ -1,9 +1,9 @@
-use crate::proxy::send_request;
 use crate::proxy::HOST;
+use crate::proxy::send_request;
 use crate::token::CURRENT_USER;
 use color_eyre::eyre::format_err;
-use reqwest::blocking::Client;
 use reqwest::StatusCode;
+use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

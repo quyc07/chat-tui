@@ -2,7 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crate::proxy::friend::Friend;
 use crate::proxy::group::{DetailRes, GroupUser};
 use crate::proxy::{friend, group};
@@ -11,7 +11,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph};
-use ratatui::{symbols, Frame};
+use ratatui::{Frame, symbols};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
@@ -192,7 +192,7 @@ impl Component for GroupManager {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
         match self.mode_holder.get_mode() {
-            Mode::GroupManager | Mode::Alert => {
+            Mode::GroupManager => {
                 let area = area_util::group_manager_area(area);
                 let [search_area, group_member_area] =
                     Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).areas(area);

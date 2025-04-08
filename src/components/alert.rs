@@ -2,16 +2,18 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::group_manager::ManageAction;
 use crate::components::recent_chat::SELECTED_STYLE;
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
+use crate::proxy::friend;
+use crate::token::CURRENT_USER;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Margin, Rect};
 use ratatui::prelude::Text;
 use ratatui::style::Color;
 use ratatui::style::Style;
-use ratatui::widgets::{Block, Clear};
+use ratatui::widgets::{Block, Clear, Wrap};
 use ratatui::widgets::{Borders, HighlightSpacing, List, ListItem};
 use ratatui::widgets::{ListState, Paragraph};
-use ratatui::{symbols, Frame};
+use ratatui::{Frame, symbols};
 use strum::IntoEnumIterator;
 
 pub struct Alert {
@@ -70,10 +72,26 @@ impl Component for Alert {
                     }
                     _ => Ok(None),
                 },
+                Some(ConfirmEvent::AddFriend(friend_uid)) => match key.code {
+                    KeyCode::Enter => {
+                        let uid = CURRENT_USER.get_user().user.unwrap().id;
+                        self.close();
+                        if let Err(e) = friend::add_friend(uid, friend_uid) {
+                            Ok(Some(Action::Alert(e.to_string(), None)))
+                        } else {
+                            Ok(Some(Action::Confirm(ConfirmEvent::AddFriend(friend_uid))))
+                        }
+                    }
+                    KeyCode::Esc => {
+                        self.close();
+                        Ok(None)
+                    }
+                    _ => Ok(None),
+                },
                 _ => {
                     self.close();
                     Ok(None)
-                },
+                }
             },
             _ => Ok(None),
         }
@@ -122,12 +140,9 @@ impl Alert {
 
     fn draw_common(&mut self, frame: &mut Frame, area: Rect) {
         let area = area_util::alert_area(area);
-        let [_, alert_area, _] = Layout::vertical([
-            Constraint::Fill(1),
-            Constraint::Length(3),
-            Constraint::Fill(1),
-        ])
-        .areas(area);
+        let [_, alert_area, _] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Min(3), Constraint::Fill(1)])
+                .areas(area);
         frame.render_widget(Clear, alert_area);
         let msg = match self.confirm_event {
             None => "Esc to quit.",
@@ -139,10 +154,14 @@ impl Alert {
             .borders(Borders::ALL)
             .border_set(symbols::border::ROUNDED);
         let msg = Paragraph::new(self.msg.as_str())
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true })
             .style(Style::default().fg(Color::Yellow))
             .alignment(Alignment::Center)
             .block(block);
-        frame.render_widget(msg, alert_area);
+        // 居中显示
+        let centered_area = area_util::cal_center_area(alert_area, self.msg.as_str());
+        frame.render_widget(msg, centered_area);
     }
 
     fn draw_manage_action(&mut self, frame: &mut Frame, area: Rect) {
