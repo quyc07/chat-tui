@@ -1,7 +1,8 @@
+use crate::components::group_manager::ManageAction;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-#[derive(Debug, Clone, PartialEq, Eq, Display, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Display, Serialize, Deserialize)]
 pub enum Action {
     Tick,
     Render,
@@ -24,4 +25,5 @@ pub enum Action {
 #[derive(Clone, Debug, Eq, PartialEq, Display, Serialize, Deserialize)]
 pub enum ConfirmEvent {
     InviteFriend,
+    GroupManage(Option<ManageAction>),
 }

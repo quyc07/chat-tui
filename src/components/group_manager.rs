@@ -2,7 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::proxy::friend::Friend;
 use crate::proxy::group::{DetailRes, GroupUser};
 use crate::proxy::{friend, group};
@@ -10,8 +10,10 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use tracing::error;
 
 pub(crate) struct GroupManager {
@@ -29,6 +31,38 @@ pub(crate) struct GroupManager {
 enum State {
     GroupDetail,
     InviteFriend,
+}
+
+#[derive(
+    Eq, PartialEq, Clone, Copy, Debug, Display, FromRepr, EnumIter, Serialize, Deserialize,
+)]
+pub(crate) enum ManageAction {
+    #[strum(to_string = "移出群聊")]
+    Evict,
+    #[strum(to_string = "禁言🤐")]
+    Forbid,
+    #[strum(to_string = "设为管理员")]
+    SetManager,
+}
+
+impl From<ManageAction> for Text<'_> {
+    fn from(action: ManageAction) -> Self {
+        let span = Span::styled(format!(">: {action}"), Style::default().fg(Color::White));
+        Line::from(span).into()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::components::group_manager::ManageAction;
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn test_enum() {
+        for e in ManageAction::iter() {
+            println!("{}", e.to_string());
+        }
+    }
 }
 
 impl Component for GroupManager {
@@ -49,6 +83,21 @@ impl Component for GroupManager {
                     KeyCode::Down => self.group_members_list_state.select_next(),
                     KeyCode::Enter => {
                         //TODO 移出群，禁言，设为管理员
+                        if let Some(idx) = self.group_members_list_state.selected() {
+                            let name = self
+                                .detail
+                                .lock()
+                                .unwrap()
+                                .users
+                                .get(idx)
+                                .unwrap()
+                                .name
+                                .clone();
+                            return Ok(Some(Action::Alert(
+                                format!("你希望将{name}:"),
+                                Some(ConfirmEvent::GroupManage(None)),
+                            )));
+                        }
                     }
                     _ => {}
                 },
