@@ -202,6 +202,10 @@ impl Component for Contact {
                             )));
                         }
                     }
+                    KeyCode::Esc => {
+                        self.clean_search();
+                        self.change_state(State::Friends)
+                    }
                     _ => {}
                 },
             }

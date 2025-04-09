@@ -59,7 +59,7 @@ pub(crate) fn add_friend(uid: i32, friend_uid: i32) -> color_eyre::Result<()> {
         match res {
             Ok(res) => match res.status() {
                 StatusCode::OK => Ok(()),
-                StatusCode::NOT_MODIFIED => {
+                StatusCode::CREATED => {
                     Err(format_err!("Failed to add friend, {}", res.text().unwrap()))
                 }
                 _ => Err(format_err!(

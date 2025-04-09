@@ -2,7 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::group_manager::ManageAction;
 use crate::components::recent_chat::SELECTED_STYLE;
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::proxy::friend;
 use crate::token::CURRENT_USER;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -13,7 +13,7 @@ use ratatui::style::Style;
 use ratatui::widgets::{Block, Clear, Wrap};
 use ratatui::widgets::{Borders, HighlightSpacing, List, ListItem};
 use ratatui::widgets::{ListState, Paragraph};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
 use strum::IntoEnumIterator;
 
 pub struct Alert {
@@ -75,10 +75,10 @@ impl Component for Alert {
                 Some(ConfirmEvent::AddFriend(friend_uid)) => match key.code {
                     KeyCode::Enter => {
                         let uid = CURRENT_USER.get_user().user.unwrap().id;
-                        self.close();
                         if let Err(e) = friend::add_friend(uid, friend_uid) {
                             Ok(Some(Action::Alert(e.to_string(), None)))
                         } else {
+                            self.close();
                             Ok(Some(Action::Confirm(ConfirmEvent::AddFriend(friend_uid))))
                         }
                     }
@@ -100,8 +100,12 @@ impl Component for Alert {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if let Action::Alert(msg, confirm_event) = action {
             self.msg = msg;
-            self.confirm_event = confirm_event;
-            self.last_mode = Some(self.mode_holder.get_mode());
+            if let None = self.confirm_event {
+                self.confirm_event = confirm_event;
+            }
+            if let None = self.last_mode {
+                self.last_mode = Some(self.mode_holder.get_mode());
+            }
             self.mode_holder.set_mode(Mode::Alert);
         }
         Ok(None)
