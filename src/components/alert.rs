@@ -2,7 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::group_manager::ManageAction;
 use crate::components::recent_chat::SELECTED_STYLE;
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crate::proxy::friend;
 use crate::token::CURRENT_USER;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -13,7 +13,7 @@ use ratatui::style::Style;
 use ratatui::widgets::{Block, Clear, Wrap};
 use ratatui::widgets::{Borders, HighlightSpacing, List, ListItem};
 use ratatui::widgets::{ListState, Paragraph};
-use ratatui::{symbols, Frame};
+use ratatui::{Frame, symbols};
 use strum::IntoEnumIterator;
 
 pub struct Alert {
@@ -100,10 +100,10 @@ impl Component for Alert {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if let Action::Alert(msg, confirm_event) = action {
             self.msg = msg;
-            if let None = self.confirm_event {
+            if  self.confirm_event.is_none() {
                 self.confirm_event = confirm_event;
             }
-            if let None = self.last_mode {
+            if self.last_mode.is_none() {
                 self.last_mode = Some(self.mode_holder.get_mode());
             }
             self.mode_holder.set_mode(Mode::Alert);

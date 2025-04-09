@@ -5,7 +5,6 @@ use crate::components::user_input::{InputData, UserInput};
 use crate::components::{area_util, Component};
 use crate::proxy::friend::{Friend, FriendReq, FriendRequestStatus};
 use crate::proxy::{friend, user};
-use chrono::{DateTime, Local};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::Color;
@@ -14,9 +13,7 @@ use ratatui::text::Text;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph};
 use ratatui::{symbols, Frame};
-use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use strum::Display;
 use tracing::error;
 
 pub(crate) struct Contact {
