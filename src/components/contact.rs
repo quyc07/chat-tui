@@ -214,10 +214,10 @@ impl From<&FriendSearchRes> for Text<'_> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum ToChat {
-    User(i32),
-    Group(i32),
+    User(i32, String),
+    Group(i32, String),
 }
 
 impl Component for Contact {
@@ -240,7 +240,10 @@ impl Component for Contact {
                             if let Some(friend) =
                                 self.friends_holder.friends.lock().unwrap().get(idx)
                             {
-                                return Ok(Some(Action::ToChat(ToChat::User(friend.id))));
+                                return Ok(Some(Action::ToChat(ToChat::User(
+                                    friend.id,
+                                    friend.name.clone(),
+                                ))));
                             }
                         }
                     }

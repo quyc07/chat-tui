@@ -331,15 +331,15 @@ impl Component for RecentChat {
                 .unwrap()
                 .iter()
                 .enumerate()
-                .find_map(|(idx, c)| match (c, to_chat) {
-                    (ChatVo::User { uid, .. }, ToChat::User(u_id)) => {
+                .find_map(|(idx, c)| match (c, to_chat.clone()) {
+                    (ChatVo::User { uid, .. }, ToChat::User(u_id, ..)) => {
                         if *uid == u_id {
                             Some(idx)
                         } else {
                             None
                         }
                     }
-                    (ChatVo::Group { gid, .. }, ToChat::Group(g_id)) => {
+                    (ChatVo::Group { gid, .. }, ToChat::Group(g_id, ..)) => {
                         if *gid == g_id {
                             Some(idx)
                         } else {
@@ -348,7 +348,36 @@ impl Component for RecentChat {
                     }
                     (_, _) => None,
                 });
-            self.list_state.lock().unwrap().select(idx)
+            match idx {
+                None => match to_chat {
+                    ToChat::User(uid, user_name) => {
+                        let chat_vo = ChatVo::User {
+                            uid,
+                            user_name,
+                            mid: 0,
+                            msg: "".to_string(),
+                            msg_time: Default::default(),
+                            unread: None,
+                        };
+                        self.chat_vos.lock().unwrap().insert(0, chat_vo)
+                    }
+                    ToChat::Group(gid, group_name) => {
+                        let vo = ChatVo::Group {
+                            gid,
+                            group_name,
+                            uid: 0,
+                            user_name: "".to_string(),
+                            mid: 0,
+                            msg: "".to_string(),
+                            msg_time: Default::default(),
+                            unread: None,
+                        };
+                        self.chat_vos.lock().unwrap().insert(0, vo)
+                    }
+                },
+                Some(idx) => self.list_state.lock().unwrap().select(Some(idx)),
+            }
+            return self.send_chat();
         }
         Ok(None)
     }
