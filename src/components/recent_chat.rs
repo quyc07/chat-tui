@@ -3,10 +3,10 @@ use crate::app::{Mode, ModeHolderLock};
 use crate::components::chat::CHAT_VO;
 use crate::components::contact::ToChat;
 use crate::components::event::{ChatMessage, MessageTarget};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crate::datetime::datetime_format;
 use crate::proxy;
-use crate::proxy::{user, HOST};
+use crate::proxy::{HOST, user};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
@@ -16,12 +16,11 @@ use ratatui::style::palette::tailwind::{BLUE, GREEN, SKY, SLATE};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState};
-use ratatui::{symbols, Frame};
+use ratatui::{Frame, symbols};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::Receiver;
-use tokio::task::id;
 use tracing::{debug, error};
 
 pub(crate) struct RecentChat {

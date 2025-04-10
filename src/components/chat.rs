@@ -197,7 +197,7 @@ impl Chat {
             ChatVo::User { uid, .. } => {
                 match proxy::send_request(move || fetch_user_history(uid))? {
                     Ok(chat_history) => {
-                        if chat_history.is_empty() { 
+                        if chat_history.is_empty() {
                             return Ok(None);
                         }
                         let last_mid = chat_history.last().unwrap().mid;

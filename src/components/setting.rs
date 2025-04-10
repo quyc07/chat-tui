@@ -1,11 +1,11 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crate::token::CURRENT_USER;
 use crossterm::event::KeyEvent;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::widgets::{Block, Borders, Paragraph};
-use ratatui::{symbols, Frame};
+use ratatui::{Frame, symbols};
 
 pub(crate) struct Setting {
     mode_holder: ModeHolderLock,

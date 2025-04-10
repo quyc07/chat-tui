@@ -1,8 +1,6 @@
+use crate::components::contact::ToChat;
 use crate::components::group_manager::ManageAction;
 use serde::{Deserialize, Serialize};
-use strum::Display;
-use crate::components::contact::ToChat;
-use crate::components::recent_chat::ChatVo;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Action {

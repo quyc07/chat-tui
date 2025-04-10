@@ -2,7 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crate::proxy::friend::{Friend, FriendReq, FriendRequestStatus};
 use crate::proxy::{friend, user};
 use crate::token::CURRENT_USER;
@@ -13,10 +13,9 @@ use ratatui::style::Style;
 use ratatui::text::Text;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph};
-use ratatui::{symbols, Frame};
+use ratatui::{Frame, symbols};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use tokio::task::id;
 use tracing::error;
 
 pub(crate) struct Contact {

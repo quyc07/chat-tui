@@ -18,8 +18,8 @@ pub mod group_manager;
 pub mod login;
 pub mod navigation;
 pub mod recent_chat;
-pub mod user_input;
 pub mod setting;
+pub mod user_input;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 ///
