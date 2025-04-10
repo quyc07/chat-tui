@@ -13,6 +13,7 @@ use crate::components::group_manager::GroupManager;
 use crate::components::login::Login;
 use crate::components::navigation::Navigation;
 use crate::components::recent_chat::RecentChat;
+use crate::components::setting::Setting;
 use crate::{
     action::Action,
     components::Component,
@@ -96,6 +97,7 @@ impl App {
         let chat = Chat::new(mode_holder.clone(), chat_rx1);
         let contact = Contact::new(mode_holder.clone());
         let group_manager = GroupManager::new(mode_holder.clone());
+        let setting = Setting::new(mode_holder.clone());
         Ok(Self {
             tick_rate,
             frame_rate,
@@ -108,6 +110,7 @@ impl App {
                 Box::new(contact),
                 Box::new(group_manager),
                 Box::new(alert),
+                Box::new(setting),
             ],
             should_suspend: false,
             config: Config::new()?,

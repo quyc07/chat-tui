@@ -70,6 +70,10 @@ pub(crate) fn group_manager_area(rect: Rect) -> Rect {
     chat(rect)
 }
 
+pub(crate) fn setting_area(rect: Rect) -> Rect {
+    dynamic_area(rect)
+}
+
 // 简单估算：按宽度估算换行后的行数
 fn estimate_line_count(text: &str, width: u16) -> usize {
     text.lines()
