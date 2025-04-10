@@ -3,10 +3,10 @@ use crate::app::{Mode, ModeHolderLock};
 use crate::components::event::{ChatMessage, MessageTarget};
 use crate::components::recent_chat::ChatVo;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy;
-use crate::proxy::{HOST, user};
+use crate::proxy::{user, HOST};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
@@ -16,13 +16,13 @@ use ratatui::prelude::{Color, Line, Span, Style};
 use ratatui::widgets::{
     Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
 };
-use ratatui::{Frame, symbols};
-use reqwest::StatusCode;
+use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::broadcast::Receiver;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> = LazyLock::new(|| {
     Arc::new(Mutex::new(ChatVoHolder {
@@ -105,21 +105,28 @@ impl ScrollBar {
 }
 
 impl Chat {
-    pub(crate) fn send_msg(&self) {
+    pub(crate) fn send_msg(&self) -> color_eyre::Result<Option<Action>> {
         let guard = CHAT_VO.lock().unwrap();
         if let Some(msg) = self.user_input.data() {
             match guard.chat_vo.clone().unwrap() {
                 ChatVo::User { uid, .. } => {
                     if let Err(err) = send_user_msg(uid, msg) {
-                        error!("error sending user msg: {}", err);
+                        Ok(Some(Action::Alert(err.to_string(), None)))
+                    } else {
+                        Ok(None)
                     }
                 }
                 ChatVo::Group { gid, .. } => {
                     if let Err(err) = send_group_msg(gid, msg) {
-                        error!("error sending user msg: {}", err);
+                        info!("chat group err: {err}");
+                        Ok(Some(Action::Alert(err.to_string(), None)))
+                    } else {
+                        Ok(None)
                     }
                 }
             }
+        } else {
+            Ok(None)
         }
     }
 
@@ -329,8 +336,9 @@ impl Component for Chat {
             ChatState::Chat => match key.code {
                 KeyCode::Enter => {
                     self.user_input.submit_message();
-                    self.send_msg();
+                    let result = self.send_msg();
                     self.user_input.reset();
+                    return result;
                 }
                 KeyCode::Char(to_insert) => self.user_input.enter_char(to_insert),
                 KeyCode::Backspace => self.user_input.delete_char(),
@@ -456,6 +464,10 @@ fn send_msg(msg: String, url: String) -> color_eyre::Result<()> {
                 debug!("sent msg: {res:?}");
                 Ok(())
             }
+            StatusCode::FORBIDDEN => {
+                debug!("sent msg: {res:?}");
+                Err(format_err!("{}", res.text()?))
+            },
             _ => Err(format_err!("Failed to send message: {res:?}")),
         },
         Err(err) => Err(format_err!("Failed to send message:{err}")),
