@@ -3,10 +3,10 @@ use crate::app::{Mode, ModeHolderLock};
 use crate::components::event::{ChatMessage, MessageTarget};
 use crate::components::recent_chat::ChatVo;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crate::datetime::datetime_format;
 use crate::proxy;
-use crate::proxy::{user, HOST};
+use crate::proxy::{HOST, user};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
@@ -16,9 +16,9 @@ use ratatui::prelude::{Color, Line, Span, Style};
 use ratatui::widgets::{
     Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
 };
-use ratatui::{symbols, Frame};
-use reqwest::blocking::Client;
+use ratatui::{Frame, symbols};
 use reqwest::StatusCode;
+use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::broadcast::Receiver;
@@ -467,7 +467,7 @@ fn send_msg(msg: String, url: String) -> color_eyre::Result<()> {
             StatusCode::FORBIDDEN => {
                 debug!("sent msg: {res:?}");
                 Err(format_err!("{}", res.text()?))
-            },
+            }
             _ => Err(format_err!("Failed to send message: {res:?}")),
         },
         Err(err) => Err(format_err!("Failed to send message:{err}")),
