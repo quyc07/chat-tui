@@ -2,9 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::group_manager::ManageAction;
 use crate::components::recent_chat::SELECTED_STYLE;
-use crate::components::{Component, area_util};
-use crate::proxy::friend;
-use crate::token::CURRENT_USER;
+use crate::components::{area_util, Component};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Margin, Rect};
 use ratatui::prelude::Text;
@@ -13,7 +11,7 @@ use ratatui::style::Style;
 use ratatui::widgets::{Block, Clear, Wrap};
 use ratatui::widgets::{Borders, HighlightSpacing, List, ListItem};
 use ratatui::widgets::{ListState, Paragraph};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
 use strum::IntoEnumIterator;
 
 pub struct Alert {
@@ -74,13 +72,27 @@ impl Component for Alert {
                 },
                 Some(ConfirmEvent::AddFriend(friend_uid)) => match key.code {
                     KeyCode::Enter => {
-                        let uid = CURRENT_USER.get_user().user.unwrap().id;
-                        if let Err(e) = friend::add_friend(uid, friend_uid) {
-                            Ok(Some(Action::Alert(e.to_string(), None)))
-                        } else {
-                            self.close();
-                            Ok(Some(Action::Confirm(ConfirmEvent::AddFriend(friend_uid))))
-                        }
+                        self.close();
+                        Ok(Some(Action::Confirm(ConfirmEvent::AddFriend(friend_uid))))
+                    }
+                    KeyCode::Esc => {
+                        self.close();
+                        Ok(None)
+                    }
+                    _ => Ok(None),
+                },
+                Some(ConfirmEvent::ConfirmFriendReq(_)) => match key.code {
+                    KeyCode::Enter => {
+                        self.close();
+                        Ok(Some(Action::Confirm(ConfirmEvent::ConfirmFriendReq(Some(
+                            true,
+                        )))))
+                    }
+                    KeyCode::Char('r') => {
+                        self.close();
+                        Ok(Some(Action::Confirm(ConfirmEvent::ConfirmFriendReq(Some(
+                            false,
+                        )))))
                     }
                     KeyCode::Esc => {
                         self.close();
@@ -100,7 +112,8 @@ impl Component for Alert {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if let Action::Alert(msg, confirm_event) = action {
             self.msg = msg;
-            if  self.confirm_event.is_none() {
+            // 如果alert再次alert，则保留第一次alert的mode和confirm_event
+            if self.confirm_event.is_none() {
                 self.confirm_event = confirm_event;
             }
             if self.last_mode.is_none() {

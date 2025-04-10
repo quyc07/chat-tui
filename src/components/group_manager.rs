@@ -2,7 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::proxy::friend::Friend;
 use crate::proxy::group::{DetailRes, GroupUser};
 use crate::proxy::{friend, group};
@@ -11,7 +11,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Span, Style, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, FromRepr};
@@ -108,19 +108,12 @@ impl Component for GroupManager {
                             .any(move |gu| gu.admin && gu.id == current_uid)
                         {
                             if let Some(idx) = self.group_members_list_state.selected() {
-                                let name = self
-                                    .detail
-                                    .lock()
-                                    .unwrap()
-                                    .users
-                                    .get(idx)
-                                    .unwrap()
-                                    .name
-                                    .clone();
-                                return Ok(Some(Action::Alert(
-                                    format!("你希望将{name}:"),
-                                    Some(ConfirmEvent::GroupManage(None)),
-                                )));
+                                if let Some(user) = self.detail.lock().unwrap().users.get(idx) {
+                                    return Ok(Some(Action::Alert(
+                                        format!("你希望将{}:", user.name),
+                                        Some(ConfirmEvent::GroupManage(None)),
+                                    )));
+                                }
                             }
                         } else {
                             return Ok(Some(Action::Alert(

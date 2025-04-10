@@ -5,6 +5,7 @@ use crate::components::user_input::{InputData, UserInput};
 use crate::components::{area_util, Component};
 use crate::proxy::friend::{Friend, FriendReq, FriendRequestStatus};
 use crate::proxy::{friend, user};
+use crate::token::CURRENT_USER;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::Color;
@@ -280,7 +281,16 @@ impl Component for Contact {
                         self.change_state(State::Friends)
                     }
                     KeyCode::Enter => {
-                        todo!("审批好友请求");
+                        if let Some(idx) = self.friend_req_list_state.selected() {
+                            if let Some(friend_req) =
+                                self.friend_req_holder.friend_reqs.lock().unwrap().get(idx)
+                            {
+                                return Ok(Some(Action::Alert(
+                                    format!("接受{}的好友请求么？", friend_req.request_name),
+                                    Some(ConfirmEvent::ConfirmFriendReq(None)),
+                                )));
+                            }
+                        }
                     }
                     _ => {}
                 },
@@ -291,9 +301,9 @@ impl Component for Contact {
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if self.mode_holder.get_mode() == Mode::Contact && self.friends_holder.need_fetch {
+            self.friends_holder.need_fetch = false;
             match friend::friends() {
                 Ok(friends) => {
-                    self.friends_holder.need_fetch = false;
                     self.friends_holder.friends = Arc::new(Mutex::new(friends));
                 }
                 Err(err) => {
@@ -302,9 +312,9 @@ impl Component for Contact {
             };
         }
         if self.mode_holder.get_mode() == Mode::Contact && self.friend_req_holder.need_fetch {
+            self.friend_req_holder.need_fetch = false;
             match friend::friend_reqs() {
                 Ok(mut friend_reqs) => {
-                    self.friend_req_holder.need_fetch = false;
                     friend_reqs.sort_by_key(|f| f.create_time);
                     self.friend_req_holder.friend_reqs = Arc::new(Mutex::new(friend_reqs));
                 }
@@ -313,9 +323,42 @@ impl Component for Contact {
                 }
             };
         }
-        if let Action::Confirm(ConfirmEvent::AddFriend(_)) = action {
-            self.clean_search();
-            self.change_state(State::Friends)
+        match action {
+            Action::Confirm(ConfirmEvent::AddFriend(friend_uid)) => {
+                let uid = CURRENT_USER.get_user().user.unwrap().id;
+                if let Err(e) = friend::add_friend(uid, friend_uid) {
+                    return Ok(Some(Action::Alert(e.to_string(), None)));
+                }
+                self.clean_search();
+                self.change_state(State::Friends);
+                self.search_list_state.select(None);
+            }
+            Action::Confirm(ConfirmEvent::ConfirmFriendReq(opt)) => {
+                if let Some(b) = opt {
+                    if let Some(idx) = self.friend_req_list_state.selected() {
+                        if let Some(friend_req) =
+                            self.friend_req_holder.friend_reqs.lock().unwrap().get(idx)
+                        {
+                            match friend::review_friend_req(
+                                friend_req.id,
+                                if b {
+                                    FriendRequestStatus::APPROVE
+                                } else {
+                                    FriendRequestStatus::REJECT
+                                },
+                            ) {
+                                Ok(_) => {}
+                                Err(e) => error!("Failed to review friend req: {}", e),
+                            }
+                        }
+                    }
+                }
+                self.friend_req_list_state.select(None);
+                self.friend_req_holder.need_fetch = true;
+                self.friends_holder.need_fetch = true;
+                self.change_state(State::Friends)
+            }
+            _ => {}
         }
         Ok(None)
     }
@@ -378,20 +421,22 @@ impl From<&Friend> for Text<'_> {
 }
 impl From<&FriendReq> for Text<'_> {
     fn from(friend_req: &FriendReq) -> Self {
-        Line::from(vec![
-            Span::styled(
-                format!("{}请求添加好友，", friend_req.request_name),
-                Style::default().fg(Color::White),
-            ),
-            Span::styled(
-                format!("{}，", friend_req.status),
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::styled(
-                format!("时间：{}", friend_req.create_time),
-                Style::default().fg(Color::White),
-            ),
-        ])
-        .into()
+        let line = Line::from(Span::styled(
+            format!("{}请求添加好友", friend_req.request_name),
+            Style::default().fg(Color::White),
+        ));
+        let line1 = Line::from(Span::styled(
+            format!("{}", friend_req.status),
+            match friend_req.status {
+                FriendRequestStatus::WAIT => Style::default().fg(Color::Yellow),
+                FriendRequestStatus::APPROVE => Style::default().fg(Color::Green),
+                FriendRequestStatus::REJECT => Style::default().fg(Color::Red),
+            },
+        ));
+        let line2 = Line::from(Span::styled(
+            format!("时间：{}", friend_req.create_time),
+            Style::default().fg(Color::White),
+        ));
+        Text::from(vec![line, line1, line2])
     }
 }

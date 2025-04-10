@@ -1,11 +1,11 @@
 use crate::datetime::datetime_format;
-use crate::proxy::HOST;
 use crate::proxy::send_request;
+use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
-use reqwest::StatusCode;
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
@@ -57,7 +57,7 @@ pub(crate) struct FriendReq {
     pub(crate) request_name: String,
     #[serde(with = "datetime_format")]
     pub(crate) create_time: DateTime<Local>,
-    pub(crate) reason: String,
+    pub(crate) reason: Option<String>,
     pub(crate) status: FriendRequestStatus,
 }
 
@@ -128,6 +128,35 @@ pub(crate) fn add_friend(uid: i32, friend_uid: i32) -> color_eyre::Result<()> {
             },
             Err(err) => Err(format_err!(
                 "Failed to add friend, uid: {uid}, friend_uid: {friend_uid}, err: {err}"
+            )),
+        }
+    })?
+}
+
+pub(crate) fn review_friend_req(
+    req_id: i32,
+    status: FriendRequestStatus,
+) -> color_eyre::Result<()> {
+    send_request(move || {
+        let current_user = CURRENT_USER.get_user();
+        let token = current_user.token.clone().unwrap();
+        let res = Client::new()
+            .post(format!("{HOST}/friend/req"))
+            .header("Authorization", format!("Bearer {token}"))
+            .json(&serde_json::json!({
+                "id": req_id,
+                "status": status,
+            }))
+            .send();
+        match res {
+            Ok(res) => match res.status() {
+                StatusCode::OK => Ok(()),
+                _ => Err(format_err!(
+                    "Failed to review friend req, req_id: {req_id}, status: {status}",
+                )),
+            },
+            Err(err) => Err(format_err!(
+                "Failed to review friend req, req_id: {req_id}, status: {status}, err: {err}"
             )),
         }
     })?
