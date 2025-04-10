@@ -2,7 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::group_manager::ManageAction;
 use crate::components::recent_chat::SELECTED_STYLE;
-use crate::components::{area_util, Component};
+use crate::components::{Component, area_util};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Layout, Margin, Rect};
 use ratatui::prelude::Text;
@@ -11,7 +11,7 @@ use ratatui::style::Style;
 use ratatui::widgets::{Block, Clear, Wrap};
 use ratatui::widgets::{Borders, HighlightSpacing, List, ListItem};
 use ratatui::widgets::{ListState, Paragraph};
-use ratatui::{symbols, Frame};
+use ratatui::{Frame, symbols};
 use strum::IntoEnumIterator;
 
 pub struct Alert {
