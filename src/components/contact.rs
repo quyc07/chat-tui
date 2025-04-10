@@ -2,7 +2,7 @@ use crate::action::{Action, ConfirmEvent};
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::recent_chat::SELECTED_STYLE;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::proxy::friend::{Friend, FriendReq, FriendRequestStatus};
 use crate::proxy::{friend, user};
 use crate::token::CURRENT_USER;
@@ -13,8 +13,10 @@ use ratatui::style::Style;
 use ratatui::text::Text;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph};
-use ratatui::{Frame, symbols};
+use ratatui::{symbols, Frame};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+use tokio::task::id;
 use tracing::error;
 
 pub(crate) struct Contact {
@@ -212,6 +214,12 @@ impl From<&FriendSearchRes> for Text<'_> {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum ToChat {
+    User(i32),
+    Group(i32),
+}
+
 impl Component for Contact {
     fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {
         if self.mode_holder.get_mode() == Mode::Contact {
@@ -228,7 +236,13 @@ impl Component for Contact {
                         self.change_state(State::FriendReq)
                     }
                     KeyCode::Enter => {
-                        todo!("跳转已有聊天页面，或者新建聊天页面");
+                        if let Some(idx) = self.friend_list_state.selected() {
+                            if let Some(friend) =
+                                self.friends_holder.friends.lock().unwrap().get(idx)
+                            {
+                                return Ok(Some(Action::ToChat(ToChat::User(friend.id))));
+                            }
+                        }
                     }
                     _ => {}
                 },

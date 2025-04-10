@@ -1,8 +1,10 @@
 use crate::components::group_manager::ManageAction;
 use serde::{Deserialize, Serialize};
 use strum::Display;
+use crate::components::contact::ToChat;
+use crate::components::recent_chat::ChatVo;
 
-#[derive(Clone, Debug, PartialEq, Eq, Display, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Action {
     Tick,
     Render,
@@ -20,9 +22,10 @@ pub enum Action {
     NextTab,
     Register,
     Group(i32),
+    ToChat(ToChat),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Display, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ConfirmEvent {
     InviteFriend,
     GroupManage(Option<ManageAction>),
