@@ -5,7 +5,7 @@ pub mod user;
 use color_eyre::eyre::format_err;
 use tokio::task::spawn_blocking;
 
-pub(crate) static HOST: &str = "http://localhost:3000";
+pub(crate) static HOST: &str = include_str!("../host");
 
 pub(crate) fn send_request<F, R>(f: F) -> color_eyre::Result<R>
 where
