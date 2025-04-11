@@ -85,7 +85,9 @@ jobs:
           toolchain: stable
 
           args: --release --target ${{ matrix.target }}
-
+        env:
+          OPENSSL_NO_VENDOR: "0"
+          OPENSSL_STATIC: "1"
 
       - name: install strip command
         shell: bash

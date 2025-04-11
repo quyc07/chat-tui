@@ -46,6 +46,7 @@ reqwest = { version = "0.12.15", features = ["json", "blocking", "stream"] }
 chrono = "0.4.40"
 jsonwebtoken = "9"
 unicode-width = "0.2.0"
+openssl = { version = "0.10", features = ["vendored"] }
 
 [profile.dev]
 incremental = true
