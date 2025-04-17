@@ -22,7 +22,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::broadcast::Receiver;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 pub(crate) static CHAT_VO: LazyLock<Arc<Mutex<ChatVoHolder>>> = LazyLock::new(|| {
     Arc::new(Mutex::new(ChatVoHolder {

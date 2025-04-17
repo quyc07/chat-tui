@@ -12,7 +12,7 @@ use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::palette::tailwind::{BLUE, GREEN, SKY, SLATE};
+use ratatui::style::palette::tailwind::SKY;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState};
@@ -390,8 +390,6 @@ impl Component for RecentChat {
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_set(symbols::border::ROUNDED);
-                // .border_style(TODO_HEADER_STYLE)
-                // .bg(NORMAL_ROW_BG);
 
                 // Iterate through all elements in the `items` and stylize them.
                 let items: Vec<ListItem> = self
@@ -408,16 +406,7 @@ impl Component for RecentChat {
                     .highlight_style(SELECTED_STYLE)
                     .highlight_spacing(HighlightSpacing::Always);
 
-                // We need to disambiguate this trait method as both `Widget` and `StatefulWidget` share the
-                // same method name `render`.
                 frame.render_stateful_widget(list, area, &mut self.list_state.lock().unwrap());
-                // 首次加载默认选中第一个
-                // TODO 首次加载第一个会出现双眼皮现象，暂时无法解决，后续再说吧
-                // let first_check = FIRST.lock().unwrap();
-                // if first_check.check && self.list_state.selected().is_none() {
-                //     info!("select first");
-                //     self.list_state.select_first();
-                // }
             }
             _ => {}
         }
@@ -425,17 +414,4 @@ impl Component for RecentChat {
     }
 }
 
-const fn alternate_colors(i: usize) -> Color {
-    if i % 2 == 0 {
-        NORMAL_ROW_BG
-    } else {
-        ALT_ROW_BG_COLOR
-    }
-}
-
-pub(crate) const TODO_HEADER_STYLE: Style = Style::new().fg(SLATE.c100).bg(BLUE.c800);
-pub(crate) const NORMAL_ROW_BG: Color = SLATE.c200;
-const ALT_ROW_BG_COLOR: Color = SLATE.c300;
 pub(crate) const SELECTED_STYLE: Style = Style::new().bg(SKY.c500).add_modifier(Modifier::BOLD);
-pub(crate) const TEXT_FG_COLOR: Color = SLATE.c600;
-const COMPLETED_TEXT_FG_COLOR: Color = GREEN.c500;

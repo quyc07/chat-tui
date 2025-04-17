@@ -2,7 +2,7 @@ use color_eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, Mutex};
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, info};
 
@@ -21,25 +21,13 @@ use crate::{
     tui::{Event, Tui},
 };
 
-pub(crate) static SHOULD_QUIT: LazyLock<Arc<Mutex<ShouldQuit>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(ShouldQuit { should_quit: false })));
-
-pub(crate) struct ShouldQuit {
-    pub(crate) should_quit: bool,
-}
-
-impl ShouldQuit {
-    pub(crate) fn set_quit(&mut self, should_quit: bool) {
-        self.should_quit = should_quit;
-    }
-}
-
 pub struct App {
     config: Config,
     tick_rate: f64,
     frame_rate: f64,
     components: Vec<Box<dyn Component>>,
     should_suspend: bool,
+    should_quit: bool,
     mode: ModeHolderLock,
     last_tick_key_events: Vec<KeyEvent>,
     action_tx: mpsc::UnboundedSender<Action>,
@@ -113,6 +101,7 @@ impl App {
                 Box::new(setting),
             ],
             should_suspend: false,
+            should_quit: false,
             config: Config::new()?,
             mode: mode_holder.clone(),
             last_tick_key_events: Vec::new(),
@@ -148,7 +137,7 @@ impl App {
                 action_tx.send(Action::ClearScreen)?;
                 // tui.mouse(true);
                 tui.enter()?;
-            } else if SHOULD_QUIT.lock().unwrap().should_quit {
+            } else if self.should_quit {
                 tui.stop()?;
                 break;
             }
@@ -213,7 +202,7 @@ impl App {
                     self.last_tick_key_events.drain(..);
                 }
                 Action::Quit => {
-                    SHOULD_QUIT.lock().unwrap().set_quit(true);
+                    self.should_quit = true;
                 }
                 Action::Suspend => self.should_suspend = true,
                 Action::Resume => self.should_suspend = false,
