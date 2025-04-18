@@ -4,7 +4,7 @@ use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::components::alert::Alert;
 use crate::components::chat::Chat;
@@ -174,7 +174,7 @@ impl App {
         };
         match keymap.get(&vec![key]) {
             Some(action) => {
-                info!("Got action: {action:?}");
+                debug!("Got action: {action:?}");
                 action_tx.send(action.clone())?;
             }
             _ => {
@@ -184,7 +184,7 @@ impl App {
 
                 // Check for multi-key combinations
                 if let Some(action) = keymap.get(&self.last_tick_key_events) {
-                    info!("Got action: {action:?}");
+                    debug!("Got action: {action:?}");
                     action_tx.send(action.clone())?;
                 }
             }

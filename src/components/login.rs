@@ -1,5 +1,4 @@
 use crate::action::Action;
-use crate::action::Action::Alert;
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::user_input::{InputData, UserInput};
 use crate::components::{Component, area_util};
@@ -237,29 +236,42 @@ impl Component for Login {
         if self.mode_holder.get_mode() == Mode::Login {
             return match action {
                 Action::Submit => {
-                    let user_name = self.user_name_input.data().unwrap();
-                    let password = self.password_input.data().unwrap();
-                    // 当前环境为异步环境，但是本方法为同步方法，不能在同步方法中直接调用异步方法，但是reqwest的同步客户端无法在异步环境中使用
-                    // 因此此处使用tokio的同步方法结合futures的同步执行器获取结果
-                    let result = proxy::send_request(|| {
-                        login(LoginReq {
-                            user_name,
-                            password,
-                        })
-                    })?;
-                    match result {
-                        Ok(token) => {
-                            let token_data = token::parse_token(token.as_str()).unwrap();
-                            CURRENT_USER.set_user(Some(token_data.claims), Some(token));
-                            let (quit_tx, quit_rx) = mpsc::channel();
-                            self.quit_tx = Some(quit_tx);
-                            renew(quit_rx);
-                            self.mode_holder.set_mode(Mode::RecentChat);
-                            Ok(Some(Action::LoginSuccess))
+                    match (self.user_name_input.data(), self.password_input.data()) {
+                        (None, None) => {
+                            return Ok(Some(Action::Alert("请输入用户名和密码".to_string(), None)));
                         }
-                        Err(err) => {
-                            error!("login failed, {err}");
-                            Ok(Some(Alert(format!("{err}"), None)))
+                        (None, Some(_)) => {
+                            return Ok(Some(Action::Alert("请输入用户名".to_string(), None)));
+                        }
+                        (Some(_), None) => {
+                            return Ok(Some(Action::Alert("请输入密码".to_string(), None)));
+                        }
+                        _ => {
+                            let user_name = self.user_name_input.data().unwrap();
+                            let password = self.password_input.data().unwrap();
+                            // 当前环境为异步环境，但是本方法为同步方法，不能在同步方法中直接调用异步方法，但是reqwest的同步客户端无法在异步环境中使用
+                            // 因此此处使用tokio的同步方法结合futures的同步执行器获取结果
+                            let result = proxy::send_request(|| {
+                                login(LoginReq {
+                                    user_name,
+                                    password,
+                                })
+                            })?;
+                            match result {
+                                Ok(token) => {
+                                    let token_data = token::parse_token(token.as_str()).unwrap();
+                                    CURRENT_USER.set_user(Some(token_data.claims), Some(token));
+                                    let (quit_tx, quit_rx) = mpsc::channel();
+                                    self.quit_tx = Some(quit_tx);
+                                    renew(quit_rx);
+                                    self.mode_holder.set_mode(Mode::RecentChat);
+                                    Ok(Some(Action::LoginSuccess))
+                                }
+                                Err(err) => {
+                                    error!("login failed, {err}");
+                                    Ok(Some(Action::Alert(format!("{err}"), None)))
+                                }
+                            }
                         }
                     }
                 }
@@ -278,7 +290,7 @@ impl Component for Login {
                         Ok(_) => Ok(Some(Action::Submit)),
                         Err(e) => {
                             error!("register failed, {e}");
-                            Ok(Some(Alert(format!("{e}"), None)))
+                            Ok(Some(Action::Alert(format!("{e}"), None)))
                         }
                     }
                 }

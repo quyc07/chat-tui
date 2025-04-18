@@ -13,7 +13,6 @@ mod area_util;
 pub mod chat;
 pub mod contact;
 pub mod event;
-pub mod fps;
 pub mod group_manager;
 pub mod login;
 pub mod navigation;
