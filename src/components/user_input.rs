@@ -220,15 +220,6 @@ impl UserInput {
         self.reset_cursor();
     }
 
-    fn cal_high(input_size: usize, area: Rect) -> u16 {
-        let total_length = (input_size * 3 + 2) as u16;
-        if area.height / 5 > total_length {
-            area.height / 5
-        } else {
-            total_length
-        }
-    }
-
     pub(crate) fn set_cursor_position(&mut self, input_area: Rect) {
         self.cursor_position = Some(Position::new(
             // Draw the cursor at the current position in the input field.

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Local, NaiveDateTime, Offset};
 
+#[allow(unused)]
 /// 自定义 Option<DateTime> 序列化
 pub mod opt_native_datetime_format {
     use chrono::NaiveDateTime;
@@ -31,7 +32,7 @@ pub mod opt_native_datetime_format {
         }
     }
 }
-
+#[allow(unused)]
 /// 自定义 DateTime 序列化
 pub mod native_datetime_format {
     use chrono::NaiveDateTime;
@@ -77,8 +78,6 @@ pub mod opt_datetime_format {
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     const FORMAT: &str = "%Y-%m-%d %H:%M:%S";
-
-    pub type OK = ();
 
     pub fn serialize<S>(date: &Option<DateTime<Local>>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -147,6 +146,7 @@ pub mod datetime_format {
     }
 }
 
+#[allow(unused)]
 pub fn native_datetime_2_datetime(value: NaiveDateTime) -> DateTime<Local> {
     DateTime::<Local>::from_naive_utc_and_offset(value, Local::now().offset().fix())
 }
