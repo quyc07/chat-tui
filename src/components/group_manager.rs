@@ -67,19 +67,6 @@ impl From<ManageAction> for Text<'_> {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use crate::components::group_manager::ManageAction;
-    use strum::IntoEnumIterator;
-
-    #[test]
-    fn test_enum() {
-        for e in ManageAction::iter() {
-            println!("{}", e.to_string());
-        }
-    }
-}
-
 impl Component for GroupManager {
     fn handle_key_event(&mut self, key: KeyEvent) -> color_eyre::Result<Option<Action>> {
         if self.mode_holder.get_mode() == Mode::GroupManager {
