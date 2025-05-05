@@ -1,11 +1,11 @@
 use crate::datetime::datetime_format;
 use crate::datetime::opt_datetime_format;
-use crate::proxy::{HOST, send_request};
+use crate::proxy::{send_request, HOST};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
-use reqwest::StatusCode;
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -34,7 +34,7 @@ pub(crate) fn detail_by_id(uid: i32) -> color_eyre::Result<UserDetail> {
     send_request(move || {
         let token = CURRENT_USER.get_user().token.clone().unwrap();
         let res = Client::new()
-            .get(format!("{HOST}/user/detail/{uid}"))
+            .get(format!("{}/user/detail/{uid}", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {
@@ -58,7 +58,7 @@ pub(crate) fn search(name: String) -> color_eyre::Result<Vec<UserDetail>> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .get(format!("{HOST}/user/search/{name}"))
+            .get(format!("{}/user/search/{name}", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {

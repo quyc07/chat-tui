@@ -131,8 +131,8 @@ fn update_unread(unread: &mut Option<String>) -> Option<String> {
     }
 }
 
-fn recent_chat() -> color_eyre::Result<Vec<ChatVo>> {
-    let url = format!("{HOST}/user/history");
+fn fetch_recent_chats() -> color_eyre::Result<Vec<ChatVo>> {
+    let url = format!("{}/chat/recent", HOST.as_str());
     let token = CURRENT_USER.get_user().token.clone().unwrap();
     let res = Client::new()
         .post(url)
@@ -312,7 +312,7 @@ impl Component for RecentChat {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if action == Action::LoginSuccess && CURRENT_USER.get_user().user.is_some() {
             let arc = self.chat_vos.clone();
-            proxy::send_request(move || match recent_chat() {
+            proxy::send_request(move || match fetch_recent_chats() {
                 Ok(items) => {
                     let mut chat_vos = arc.lock().unwrap();
                     *chat_vos = items;

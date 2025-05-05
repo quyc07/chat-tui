@@ -3,9 +3,13 @@ pub mod group;
 pub mod user;
 
 use color_eyre::eyre::format_err;
+use std::env;
+use std::sync::LazyLock;
 use tokio::task::spawn_blocking;
 
-pub(crate) static HOST: &str = include_str!("../host");
+pub(crate) static HOST: LazyLock<String> = LazyLock::new(|| {
+    env::var("CHAT_SERVER_HOST").ok().expect("host env not set")
+});
 
 pub(crate) fn send_request<F, R>(f: F) -> color_eyre::Result<R>
 where

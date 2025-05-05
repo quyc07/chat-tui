@@ -1,9 +1,9 @@
-use crate::proxy::HOST;
 use crate::proxy::send_request;
+use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use color_eyre::eyre::format_err;
-use reqwest::StatusCode;
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -26,7 +26,7 @@ pub(crate) fn detail(gid: i32) -> color_eyre::Result<DetailRes> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .get(format!("{HOST}/group/{gid}"))
+            .get(format!("{}/group/{gid}", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {
@@ -54,7 +54,7 @@ pub(crate) fn invite(uid: i32, gid: i32) -> color_eyre::Result<()> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .put(format!("{HOST}/group/{gid}/{uid}"))
+            .put(format!("{}/group/{gid}/{uid}", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {
@@ -77,7 +77,7 @@ pub(crate) fn evict(gid: i32, uid: i32) -> color_eyre::Result<()> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .delete(format!("{HOST}/group/{gid}/{uid}"))
+            .delete(format!("{}/group/{gid}/{uid}", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {
@@ -100,7 +100,7 @@ pub(crate) fn forbid(gid: i32, uid: i32) -> color_eyre::Result<()> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .put(format!("{HOST}/group/{gid}/forbid/{uid}"))
+            .put(format!("{}/group/{gid}/forbid/{uid}", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {
@@ -123,7 +123,7 @@ pub(crate) fn un_forbid(gid: i32, uid: i32) -> color_eyre::Result<()> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .delete(format!("{HOST}/group/{gid}/forbid/{uid}"))
+            .delete(format!("{}/group/{gid}/forbid/{uid}", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {
@@ -146,7 +146,7 @@ pub(crate) fn set_manager(gid: i32, uid: i32) -> color_eyre::Result<()> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .patch(format!("{HOST}/group/{gid}/admin/{uid}"))
+            .patch(format!("{}/group/{gid}/admin/{uid}", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {

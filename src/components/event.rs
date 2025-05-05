@@ -52,7 +52,7 @@ impl Event {
         tokio::task::spawn(async move {
             // 检查是否可以开始fetch消息
             check_need_fetch(arc).await;
-            let url = format!("{HOST}/event/stream");
+            let url = format!("{}/event/stream", HOST.as_str());
             let token = CURRENT_USER.get_user().token.clone().unwrap();
             let res = Client::new()
                 .get(url)

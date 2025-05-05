@@ -1,11 +1,11 @@
 use crate::datetime::datetime_format;
-use crate::proxy::HOST;
 use crate::proxy::send_request;
+use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
-use reqwest::StatusCode;
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
@@ -20,7 +20,7 @@ pub(crate) fn friends() -> color_eyre::Result<Vec<Friend>> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .get(format!("{HOST}/friend"))
+            .get(format!("{}/friend", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {
@@ -77,7 +77,7 @@ pub(crate) fn friend_reqs() -> color_eyre::Result<Vec<FriendReq>> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .get(format!("{HOST}/friend/req"))
+            .get(format!("{}/friend/req", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .send();
         match res {
@@ -112,7 +112,7 @@ pub(crate) fn add_friend(uid: i32, friend_uid: i32) -> color_eyre::Result<()> {
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .post(format!("{HOST}/friend/req/{friend_uid}"))
+            .post(format!("{}/friend/req/{friend_uid}", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .json(&serde_json::json!({}))
             .send();
@@ -142,7 +142,7 @@ pub(crate) fn review_friend_req(
         let current_user = CURRENT_USER.get_user();
         let token = current_user.token.clone().unwrap();
         let res = Client::new()
-            .post(format!("{HOST}/friend/req"))
+            .post(format!("{}/friend/req", HOST.as_str()))
             .header("Authorization", format!("Bearer {token}"))
             .json(&serde_json::json!({
                 "id": req_id,

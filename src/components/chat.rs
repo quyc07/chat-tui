@@ -3,10 +3,10 @@ use crate::app::{Mode, ModeHolderLock};
 use crate::components::event::{ChatMessage, MessageTarget};
 use crate::components::recent_chat::ChatVo;
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::datetime::datetime_format;
 use crate::proxy;
-use crate::proxy::{HOST, user};
+use crate::proxy::{user, HOST};
 use crate::token::CURRENT_USER;
 use chrono::{DateTime, Local};
 use color_eyre::eyre::format_err;
@@ -16,9 +16,9 @@ use ratatui::prelude::{Color, Line, Span, Style};
 use ratatui::widgets::{
     Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
 };
-use ratatui::{Frame, symbols};
-use reqwest::StatusCode;
+use ratatui::{symbols, Frame};
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::broadcast::Receiver;
@@ -441,12 +441,12 @@ pub struct SendMsgReq {
 }
 
 fn send_user_msg(uid: i32, msg: String) -> color_eyre::Result<()> {
-    let url = format!("{HOST}/user/{uid}/send");
+    let url = format!("{}/user/{uid}/send", HOST.as_str());
     proxy::send_request(|| send_msg(msg, url))?
 }
 
 fn send_group_msg(gid: i32, msg: String) -> color_eyre::Result<()> {
-    let url = format!("{HOST}/group/{gid}/send");
+    let url = format!("{}/group/{gid}/send", HOST.as_str());
     proxy::send_request(|| send_msg(msg, url))?
 }
 
@@ -481,7 +481,7 @@ enum ChatHistory {
 }
 
 fn fetch_user_history(target_uid: i32) -> color_eyre::Result<Vec<UserHistoryMsg>> {
-    let url = format!("{HOST}/user/{target_uid}/history");
+    let url = format!("{}/user/{target_uid}/history", HOST.as_str());
     let token = CURRENT_USER.get_user().token.clone().unwrap();
     let res = Client::new()
         .get(url)
@@ -525,7 +525,7 @@ struct GroupHistoryMsg {
 }
 
 fn fetch_group_history(gid: i32) -> color_eyre::Result<Vec<GroupHistoryMsg>> {
-    let url = format!("{HOST}/group/{gid}/history");
+    let url = format!("{}/group/{gid}/history", HOST.as_str());
     let token = CURRENT_USER.get_user().token.clone().unwrap();
     let res = Client::new()
         .get(url)
@@ -552,7 +552,7 @@ enum UpdateReadIndex {
 fn set_read_index(ri: UpdateReadIndex) -> color_eyre::Result<()> {
     let token = CURRENT_USER.get_user().token.clone().unwrap();
     let res = Client::new()
-        .put(format!("{HOST}/ri"))
+        .put(format!("{}/ri", HOST.as_str()))
         .header("Authorization", format!("Bearer {token}"))
         .json(&ri)
         .send();

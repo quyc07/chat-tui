@@ -1,19 +1,19 @@
 use crate::action::Action;
 use crate::app::{Mode, ModeHolderLock};
 use crate::components::user_input::{InputData, UserInput};
-use crate::components::{Component, area_util};
+use crate::components::{area_util, Component};
 use crate::proxy::HOST;
 use crate::token::CURRENT_USER;
 use crate::{proxy, token};
 use color_eyre::eyre::format_err;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
-use reqwest::StatusCode;
+use ratatui::Frame;
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -87,7 +87,7 @@ struct UserRegisterReq {
 }
 
 fn register(req: UserRegisterReq) -> color_eyre::Result<i32> {
-    let register_url = format!("{HOST}/user/register");
+    let register_url = format!("{}/user/register", HOST.as_str());
     let client = Client::new();
     let response = client.post(register_url).json(&req).send();
 
@@ -117,10 +117,10 @@ struct LoginRes {
 }
 
 fn login(login: LoginReq) -> color_eyre::Result<String> {
-    let login_url = format!("{HOST}/token/login");
+    let url = format!("{}/login", HOST.as_str());
     let client = Client::new();
     let response = client
-        .post(login_url)
+        .post(url)
         .json(&serde_json::json!({
             "name": login.user_name,
             "password": login.password,
@@ -160,7 +160,7 @@ fn renew(quit_rx: Receiver<()>) {
                         Some(token) => token,
                     };
                     let token = format!("Bearer {token}");
-                    let renew_url = format!("{HOST}/token/renew");
+                    let renew_url = format!("{}/token/renew", HOST.as_str());
                     let client = Client::new();
                     let response = client
                         .patch(renew_url)
