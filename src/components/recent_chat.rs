@@ -21,7 +21,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::Receiver;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 pub(crate) struct RecentChat {
     mode_holder: ModeHolderLock,
@@ -132,7 +132,7 @@ fn update_unread(unread: &mut Option<String>) -> Option<String> {
 }
 
 fn fetch_recent_chats() -> color_eyre::Result<Vec<ChatVo>> {
-    let url = format!("{}/chat/recent", HOST.as_str());
+    let url = format!("{}/user/history", HOST.as_str());
     let token = CURRENT_USER.get_user().token.clone().unwrap();
     let res = Client::new()
         .post(url)
@@ -314,6 +314,7 @@ impl Component for RecentChat {
             let arc = self.chat_vos.clone();
             proxy::send_request(move || match fetch_recent_chats() {
                 Ok(items) => {
+                    items.iter().for_each(|c| info!("chatVo:{:?}", c));
                     let mut chat_vos = arc.lock().unwrap();
                     *chat_vos = items;
                 }
